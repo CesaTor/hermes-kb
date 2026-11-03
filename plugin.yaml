@@ -1,0 +1,10 @@
+name: requrv-kb
+version: 0.1.0
+description: "ReQurv KB: collega la KB aziendale sincronizzata e installa i bot della libreria come profili Hermes."
+author: ReQurv
+license: LicenseRef-ReQurv-Proprietary
+manifest_version: 2
+kind: standalone
+provides_tools: []
+provides_hooks:
+  - pre_tool_call
