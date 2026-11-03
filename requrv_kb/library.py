@@ -166,6 +166,7 @@ def _record(profile: Path, pkg: package.Package, *, preserve_config: bool, **ext
 def _after_copy(profile: Path, conn: kb_connection.Connection) -> None:
     profile_config.seed_provider(profile)
     profile_config.seed_skills_dir(profile, kb_connection.personal_skills_dir(conn))
+    profile_config.install_plugin_copy(profile)
     profile_config.enable_plugin(profile)
 
 
@@ -252,6 +253,7 @@ def sync(only: Optional[Path] = None) -> list[dict[str, Any]]:
         for profile in ([only] if only is not None else named_profiles()):
             record = ledger.read(profile)
             if record and record.get("source"):
+                profile_config.install_plugin_copy(profile)  # a plugin update reaches every bot
                 results.append(_sync_profile(profile, record, conn))
     return results
 

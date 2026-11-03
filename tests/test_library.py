@@ -107,3 +107,17 @@ def test_a_new_conversation_with_a_library_bot_pulls_its_new_version(connected, 
                      "[t.join(120) for t in threading.enumerate() if t.name == 'requrv-kb-sync']", bot)
     assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"
     assert connected.kb("status")["bots"][0]["version"] == "2.0.0"
+
+
+def test_hermes_loads_the_plugin_inside_the_bot_and_plugin_updates_reach_it(connected):
+    connected.kb("install", "marketing")
+    # Hermes discovers a profile's plugins only under <profile>/plugins: `kb` exists in the bot's own CLI.
+    assert connected.hermes("kb", "--json", "status", profile="marketing").returncode == 0
+    listed = connected.hermes("plugins", "list", profile="marketing").stdout
+    assert "requrv-kb" in listed and "enabled" in listed
+    copy = connected.profile("marketing") / "plugins" / "requrv-kb"
+    marker = (copy / ".requrv-kb-copy").read_text()
+    (connected.plugin / "README.md").write_text("nuova versione del plugin\n")  # `hermes plugins update` at the root
+    connected.kb("sync")
+    assert (copy / "README.md").read_text() == "nuova versione del plugin\n"
+    assert (copy / ".requrv-kb-copy").read_text() != marker

@@ -7,13 +7,18 @@
   key from ``.env``, nothing else. A model or key the bot already has is never replaced.
 * **Skills.** ``skills.create_dir`` points at the operator's personal ``skills`` folder, so a skill
   the bot writes is shared through the operator's island.
-* **Plugin.** ``requrv-kb`` is enabled in the bot's profile so its library locks apply there.
+* **Plugin.** Hermes loads a profile's plugins only from ``<profile>/plugins/``, so the bot gets
+  its own copy of ``requrv-kb`` (refreshed from the main install's copy at every install, update
+  and sync) and has it enabled: that is what puts the KB prompt, proposals, locks and session-start
+  updates into the bot's sessions.
 * **Managed keys.** On update the package's ``config_managed`` keys replace the profile's own.
 """
 
 from __future__ import annotations
 
 import copy
+import hashlib
+import shutil
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -163,6 +168,45 @@ def seed_skills_dir(profile: Path, skills_dir: Path) -> None:
     skills["create_dir"] = str(skills_dir)
     config["skills"] = skills
     write_config(path, config)
+
+
+_SKIP = frozenset({".git", "tests", "__pycache__", ".pytest_cache", "dist", ".DS_Store"})
+_COPY_IGNORE = shutil.ignore_patterns(*_SKIP, ".install-metadata.json*")
+_COPY_MARKER = ".requrv-kb-copy"
+
+
+def _plugin_source() -> Path:
+    """The main install's plugin folder (what ``hermes plugins install/update`` manages)."""
+    main = install_root() / "plugins" / PLUGIN_ID
+    return main if (main / "plugin.yaml").is_file() else Path(__file__).resolve().parents[1]
+
+
+def _fingerprint(root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root)
+        if path.is_file() and not _SKIP.intersection(rel.parts) and not rel.name.startswith(".install-metadata"):
+            digest.update(rel.as_posix().encode() + b"\0" + path.read_bytes())
+    return digest.hexdigest()
+
+
+def install_plugin_copy(profile: Path) -> bool:
+    """Put the current plugin into ``<profile>/plugins/requrv-kb``; True when it changed."""
+    source = _plugin_source()
+    target = Path(profile) / "plugins" / PLUGIN_ID
+    if source.resolve() == target.resolve():
+        return False
+    fingerprint = _fingerprint(source)
+    marker = target / _COPY_MARKER
+    if marker.is_file() and marker.read_text(encoding="utf-8").strip() == fingerprint:
+        return False
+    staging = target.with_name(f".{PLUGIN_ID}.staging")
+    shutil.rmtree(staging, ignore_errors=True)
+    shutil.copytree(source, staging, ignore=_COPY_IGNORE)
+    (staging / _COPY_MARKER).write_text(fingerprint + "\n", encoding="utf-8")
+    shutil.rmtree(target, ignore_errors=True)
+    staging.rename(target)
+    return True
 
 
 def enable_plugin(profile: Path) -> None:
