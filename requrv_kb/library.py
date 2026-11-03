@@ -28,7 +28,6 @@ from .yamlio import safe_load
 _LOCK = threading.RLock()
 ALLOWLIST_FILENAME = "bots.yaml"
 WILDCARD = "*"
-PROPOSALS_DIRNAME = "proposte"
 ARCHIVE_DIRNAME = "Archivio"
 
 
@@ -304,7 +303,9 @@ def _split_blocks(text: str) -> tuple[str, list[tuple[str, str]]]:
 def archive_proposals(pkg: package.Package, conn: kb_connection.Connection) -> None:
     """Move the operator's proposals a new release incorporated or declined to ``proposte/Archivio``."""
     resolved = set(pkg.proposals_resolved) | set(pkg.proposals_rejected)
-    path = Path(conn.personal) / PROPOSALS_DIRNAME / f"{pkg.name}.md"
+    from .prompt import proposals_path
+
+    path = proposals_path(conn, pkg.name)
     if not resolved or not path.is_file():
         return
     preamble, blocks = _split_blocks(path.read_text(encoding="utf-8-sig"))

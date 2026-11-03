@@ -3,7 +3,8 @@
 A ``pre_tool_call`` hook blocks the agent's file writes, skill edits and scheduled-job edits
 that touch library-owned content (the ledger's files, a shipped skill's folder, a shipped job, a
 ``config.yaml`` with ``config_managed`` keys). Everything the user or agent created stays
-editable. To customise a library bot, duplicate it: the copy has no ledger and no lock.
+editable. A change the user wants in a library bot's behaviour goes to the operator's proposals
+file instead (see :mod:`.prompt`), which the refusal names; duplicating the bot is the other way out.
 
 Not covered: a shell command that rewrites a file, and edits made from the app's settings
 screens (core routes no plugin can veto). The next library update restores owned content anyway.
@@ -29,10 +30,16 @@ _NOUNS = {"file": "Questo file", "skill": "Questa skill", "job": "Questa attivit
 
 
 def _message(profile: Path, kind: str) -> str:
+    from . import connection as kb_connection
+    from .prompt import proposals_path
+
     record = ledger.read(profile) or {}
     bot = record.get("bot") or profile.name
-    return (f"{_NOUNS[kind]} appartiene al bot di libreria «{bot}» e viene sostituito a ogni aggiornamento. "
-            "Per personalizzarlo, duplica il bot come bot personale.")
+    conn = kb_connection.load()
+    where = (f"Scrivi la modifica come proposta in {proposals_path(conn, bot)} (un blocco «## <id>»): vale dalla "
+             "prossima conversazione e l'IT la valuta per tutti." if conn is not None
+             else "Per personalizzarlo, duplica il bot come bot personale.")
+    return f"{_NOUNS[kind]} appartiene al bot di libreria «{bot}» e viene sostituito a ogni aggiornamento. {where}"
 
 
 def _norm(rel: str) -> str:

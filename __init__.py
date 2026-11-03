@@ -29,4 +29,5 @@ def register(ctx):
                          argument_mode="mixed")
     ctx.register_hook("pre_tool_call", kb.locks.pre_tool_call)
     ctx.register_system_prompt_section("requrv-kb.connection", kb.prompt.section)
+    ctx.register_system_prompt_section("requrv-kb.proposals", kb.prompt.proposals_section)
     ctx.register_skill("setup", _ROOT / "skills" / "setup" / "SKILL.md")

@@ -17,6 +17,7 @@ configura ReQurv Bridge; il plugin lo copia nei bot che installa.
 | Bot di libreria non modificabili dall'agente (file, skill, attività pianificate) | `requrv_kb/locks.py` (hook `pre_tool_call`) |
 | Provider del coordinatore copiato nel bot (modello, endpoint `providers.<nome>`, chiave) | `requrv_kb/profile_config.py` |
 | Percorsi della KB nel prompt di ogni nuova sessione | `requrv_kb/prompt.py` |
+| Proposte dell'operatore: estendono il SOUL del bot dalla sessione successiva, finché l'IT non le recepisce | `requrv_kb/prompt.py`, `library.py` |
 | File non scaricati dal cloud rilevati prima di copiare | `requrv_kb/cloud_files.py` |
 | Pagina **Libreria** nell'app Desktop, impostazioni, sync all'avvio | `desktop/plugin.js` + `dashboard/plugin_api.py` |
 | Comandi `hermes kb ...` e `/kb ...` in chat, skill `requrv-kb:setup` | `requrv_kb/cli.py` |
@@ -47,6 +48,18 @@ hermes kb install marketing
 ```
 
 I bot installati compaiono nella sezione **Bots**. Le modifiche valgono dalla conversazione successiva.
+
+## Proposte al SOUL
+
+Il SOUL di un bot di libreria non si modifica, ma l'utente non ha bisogno di un bot personale:
+
+1. Quando l'utente chiede un cambiamento stabile (tono, regole, compiti), il bot lo scrive come
+   proposta in `Operatori/<operatore>/proposte/<bot>.md`, un blocco `## <id>` per proposta.
+2. Dalla conversazione successiva il bot applica quel file come estensione del proprio SOUL.
+3. L'IT legge le proposte dalla cartella dell'operatore, inserisce quelle buone nel SOUL della
+   libreria, alza la `version` e ne elenca gli id in `proposals_resolved` (o `proposals_rejected`).
+4. Al riavvio dell'app tutti i bot si aggiornano; i blocchi valutati passano in
+   `proposte/Archivio/` con l'esito, e il file dell'operatore resta con quelli ancora aperti.
 
 ## Struttura della KB
 

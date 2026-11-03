@@ -13,6 +13,12 @@ def _hook(hermes, home, calls):
     return json.loads(hermes.python(code, home))
 
 
+def connected_kb_personal(hermes):
+    from pathlib import Path
+
+    return Path(json.loads((hermes.root / "plugin-data" / "requrv-kb" / "connection.json").read_text())["personal"])
+
+
 def test_library_bot_content_is_locked_and_user_content_is_not(connected):
     connected.kb("install", "marketing")
     bot = connected.profile("marketing")
@@ -29,7 +35,8 @@ def test_library_bot_content_is_locked_and_user_content_is_not(connected):
         ["read_file", {"path": str(bot / "SOUL.md")}],
     ])
     assert [r and r["action"] for r in results] == ["block"] * 5 + [None] * 3
-    assert "marketing" in results[0]["message"] and "duplica" in results[0]["message"].lower()
+    assert "marketing" in results[0]["message"]
+    assert str(connected_kb_personal(connected) / "proposte" / "marketing.md") in results[0]["message"]
 
 
 def test_another_bot_cannot_edit_a_library_bot_either(connected):
@@ -49,3 +56,40 @@ def test_prompt_section_names_the_connected_folders(connected, kb):
     assert "«marketing»" in text
     plain = connected.python("from requrv_kb.prompt import section; print(section({}))", connected.root)
     assert "bot di libreria" not in plain
+
+
+def _sections(hermes, home):
+    code = ("import json\nfrom requrv_kb.prompt import section, proposals_section\n"
+            "print(json.dumps([section({}), proposals_section({})]))")
+    return json.loads(hermes.python(code, home))
+
+
+def test_operator_proposals_extend_the_soul_until_it_folds_them_in(connected, kb):
+    from conftest import write_yaml
+
+    connected.kb("install", "marketing")
+    bot = connected.profile("marketing")
+    proposals = kb["personal"] / "proposte" / "marketing.md"
+    # The agent may write the proposals file: it is the operator's, not the library's.
+    assert _hook(connected, bot, [["write_file", {"path": str(proposals), "content": "x"}]]) == [None]
+    assert _sections(connected, bot)[1] == ""
+
+    proposals.parent.mkdir(parents=True)
+    proposals.write_text("## tono-formale\nDai sempre del lei.\nMotivo: clienti istituzionali.\n\n"
+                         "## firma\nChiudi con la firma del reparto.\n")
+    guidance, overlay = _sections(connected, bot)
+    assert str(proposals) in guidance
+    assert "Dai sempre del lei." in overlay and "Chiudi con la firma" in overlay
+
+    # IT folds one proposal into the library SOUL and declines the other; the next sync updates the bot.
+    (kb["marketing"] / "SOUL.md").write_text("# Marketing v2\nDai sempre del lei.\n")
+    write_yaml(kb["marketing"] / "distribution.yaml", {
+        "name": "marketing", "version": "2.0.0", "config_managed": ["agent.max_turns", "mcp_servers"],
+        "proposals_resolved": ["tono-formale"], "proposals_rejected": ["firma"]})
+    assert connected.kb("sync")["results"][0]["status"] == "updated"
+    assert (bot / "SOUL.md").read_text().startswith("# Marketing v2")
+    assert proposals.read_text() == ""
+    archived = (proposals.parent / "Archivio").glob("marketing-*.md")
+    text = "".join(a.read_text() for a in archived)
+    assert "Recepita nella versione 2.0.0" in text and "Rifiutata nella versione 2.0.0" in text
+    assert _sections(connected, bot)[1] == ""
