@@ -37,6 +37,12 @@ def proposals_path(conn: kb_connection.Connection, bot: str) -> Path:
     return Path(conn.personal) / PROPOSALS_DIRNAME / f"{bot}.md"
 
 
+def organization_root(conn: kb_connection.Connection) -> Optional[Path]:
+    """The folder holding ``Biblioteca-Agenti`` (what library skills call ``$SECOND_BRAIN_ROOT``)."""
+    libraries = kb_connection.library_dirs(conn.roots)
+    return libraries[0].parent if len(libraries) == 1 else None
+
+
 def section(_session: Mapping[str, Any] | None = None) -> str:
     conn = kb_connection.load()
     if conn is None:
@@ -46,6 +52,8 @@ def section(_session: Mapping[str, Any] | None = None) -> str:
         "Cartelle della KB sincronizzate su questo computer:",
         *(f"- {root}" for root in conn.roots),
         f"Cartella personale dell'operatore {conn.operator}: {conn.personal}",
+        *([f"La radice dell'organizzazione ($SECOND_BRAIN_ROOT nelle skill) è {root}."]
+          if (root := organization_root(conn)) else []),
         "Leggi i documenti da queste cartelle e cita sempre i file da cui prendi le informazioni.",
         "Scrivi bozze e nuovi file solo nella cartella personale; i permessi del cloud decidono il resto.",
     ]

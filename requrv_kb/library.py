@@ -219,36 +219,40 @@ def rollback(profile_name: str) -> dict[str, Any]:
         return {"profile": target.name, "version": ledger.rollback(target)}
 
 
-def sync() -> list[dict[str, Any]]:
-    """Bring every library bot to the version its package offers now; safe at every app start.
+def _sync_profile(profile: Path, record: dict[str, Any], conn: kb_connection.Connection) -> dict[str, Any]:
+    result: dict[str, Any] = {"profile": profile.name, "from": record.get("version"),
+                              "to": record.get("version"), "status": "unchanged"}
+    try:
+        source = Path(str(record["source"]))
+        if not source.is_dir():
+            raise FileNotFoundError
+        package.assert_downloaded(source / package.MANIFEST)
+        pkg = package.read(source)
+        if pkg.version not in (record.get("version"), record.get("rolled_back_from")):
+            result["to"] = _update(profile, record, pkg, conn)["version"]
+            result["status"] = "updated"
+    except FileNotFoundError:
+        result.update(status="source-unavailable", error="La cartella della libreria non è disponibile.")
+    except KBError as exc:
+        result.update(status="error", error=str(exc))
+    return result
 
-    A package folder that is gone or not downloaded reports ``source-unavailable``; a version the
-    user rolled back from is not re-applied until the library publishes another one."""
+
+def sync(only: Optional[Path] = None) -> list[dict[str, Any]]:
+    """Bring library bots (every one, or just *only*) to the version their package offers now.
+
+    Safe at every app start and session start: a package folder that is gone or not downloaded
+    reports ``source-unavailable``; a version the user rolled back from is not re-applied until
+    the library publishes another one."""
     results: list[dict[str, Any]] = []
     conn = kb_connection.load()
     if conn is None:
         return results
     with _LOCK:
-        for profile in named_profiles():
+        for profile in ([only] if only is not None else named_profiles()):
             record = ledger.read(profile)
-            if not record or not record.get("source"):
-                continue
-            result: dict[str, Any] = {"profile": profile.name, "from": record.get("version"),
-                                      "to": record.get("version"), "status": "unchanged"}
-            try:
-                source = Path(str(record["source"]))
-                if not source.is_dir():
-                    raise FileNotFoundError
-                package.assert_downloaded(source / package.MANIFEST)
-                pkg = package.read(source)
-                if pkg.version not in (record.get("version"), record.get("rolled_back_from")):
-                    result["to"] = _update(profile, record, pkg, conn)["version"]
-                    result["status"] = "updated"
-            except FileNotFoundError:
-                result.update(status="source-unavailable", error="La cartella della libreria non è disponibile.")
-            except KBError as exc:
-                result.update(status="error", error=str(exc))
-            results.append(result)
+            if record and record.get("source"):
+                results.append(_sync_profile(profile, record, conn))
     return results
 
 

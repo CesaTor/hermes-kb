@@ -95,3 +95,15 @@ def test_duplicate_is_a_personal_bot_outside_the_library(connected):
     assert (copy / "SOUL.md").read_text() == "# Marketing v1\n"
     assert not (copy / ".library-owned.json").exists() and not (copy / "distribution.yaml").exists()
     assert [b["profile"] for b in connected.kb("status")["bots"]] == ["marketing"]
+
+
+def test_a_new_conversation_with_a_library_bot_pulls_its_new_version(connected, kb):
+    connected.kb("install", "marketing")
+    bot = connected.profile("marketing")
+    write_yaml(kb["marketing"] / "distribution.yaml", {"name": "marketing", "version": "2.0.0"})
+    (kb["marketing"] / "SOUL.md").write_text("# Marketing v2\n")
+    connected.python("import threading\nfrom requrv_kb.autosync import on_session_start\n"
+                     "on_session_start(session_id='s', model='m', platform='cli')\n"
+                     "[t.join(120) for t in threading.enumerate() if t.name == 'requrv-kb-sync']", bot)
+    assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"
+    assert connected.kb("status")["bots"][0]["version"] == "2.0.0"

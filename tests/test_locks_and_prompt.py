@@ -53,6 +53,7 @@ def test_prompt_section_names_the_connected_folders(connected, kb):
     connected.kb("install", "marketing")
     text = connected.python("from requrv_kb.prompt import section; print(section({}))", connected.profile("marketing"))
     assert str(kb["library"]) in text and str(kb["personal"]) in text
+    assert f"($SECOND_BRAIN_ROOT nelle skill) è {kb['library'].parent}." in text
     assert "«marketing»" in text
     plain = connected.python("from requrv_kb.prompt import section; print(section({}))", connected.root)
     assert "bot di libreria" not in plain
