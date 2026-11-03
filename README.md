@@ -27,12 +27,18 @@ la pagina Libreria risponde quando il profilo attivo nell'app è il coordinatore
 
 ## Installazione
 
-1. Copia questa cartella in `~/.hermes/plugins/requrv-kb` (Windows: `%LOCALAPPDATA%\hermes\plugins\requrv-kb`
-   o la cartella `plugins` dell'installazione Hermes).
-2. Abilita il lato agente nel profilo coordinatore: `hermes plugins enable requrv-kb`.
-3. Riavvia Hermes Desktop, poi **Capabilities → Plugins → ReQurv KB → attiva** (il lato Desktop di
-   un pacchetto parte disattivato).
-4. Apri **Libreria** nella barra laterale e collega le cartelle, oppure:
+Serve Hermes (CLI o Desktop) con un provider già configurato nel profilo principale (per ReQurv
+Hive lo fa ReQurv Bridge). Poi, a scelta:
+
+- **Un clic** (Hermes Desktop): [installa ReQurv KB](hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1)
+  — link `hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1`, conferma nel dialogo di Hermes.
+- **Desktop:** Capabilities → Plugins → Install from Git → `https://github.com/CesaTor/hermes-kb`.
+- **Terminale:** `hermes plugins install CesaTor/hermes-kb --enable`
+
+Poi, una volta sola: riavvia Hermes Desktop e attiva **ReQurv KB** in Capabilities → Plugins (il
+lato Desktop di un plugin parte spento). Aggiornamenti: `hermes plugins update requrv-kb`.
+
+Collega la KB dalla pagina **Libreria** nella barra laterale, oppure:
 
 ```sh
 hermes kb connect --root "/percorso/Biblioteca-Agenti" --root "/percorso/01-Marketing" --personal "/percorso/mario"
