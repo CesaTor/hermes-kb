@@ -7,6 +7,9 @@ every other Desktop request). Refusals come back as HTTP 400 with a sentence in 
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import importlib
+import importlib.util
 import sys
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -14,13 +17,24 @@ from typing import Any, Callable, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-_ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
 
-from requrv_kb import connection as kb_connection  # noqa: E402  (after the path setup above)
-from requrv_kb import library  # noqa: E402
-from requrv_kb.paths import KBError  # noqa: E402
+def _load_service():
+    """This copy's ``requrv_kb`` package under a name unique to its folder (see ``__init__.py``)."""
+    package_dir = Path(__file__).resolve().parent.parent / "requrv_kb"
+    # Folder and code version: a `hermes plugins update` in a running gateway loads the new code.
+    stamp = max(f.stat().st_mtime_ns for f in package_dir.glob("*.py"))
+    name = "requrv_kb_" + hashlib.sha256(f"{package_dir}:{stamp}".encode()).hexdigest()[:12]
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(
+            name, package_dir / "__init__.py", submodule_search_locations=[str(package_dir)])
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return (importlib.import_module(f"{name}.connection"), importlib.import_module(f"{name}.library"),
+            importlib.import_module(f"{name}.paths").KBError)
+
+
+kb_connection, library, KBError = _load_service()
 
 router = APIRouter()
 

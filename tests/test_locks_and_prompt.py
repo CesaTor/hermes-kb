@@ -94,3 +94,22 @@ def test_operator_proposals_extend_the_soul_until_it_folds_them_in(connected, kb
     text = "".join(a.read_text() for a in archived)
     assert "Recepita nella versione 2.0.0" in text and "Rifiutata nella versione 2.0.0" in text
     assert _sections(connected, bot)[1] == ""
+
+
+def test_hermes_loader_renders_the_sections_inside_the_bot(connected, kb):
+    """Through Hermes' own discovery, and without a process-wide module name that another profile's
+    copy of the plugin (one gateway serves them all) could shadow."""
+    connected.kb("install", "marketing")
+    (kb["personal"] / "proposte").mkdir(parents=True)
+    (kb["personal"] / "proposte" / "marketing.md").write_text("## tono\nDai del lei.\n")
+    code = f"""
+import json, sys
+from hermes_cli.plugins import discover_plugins, render_system_prompt_sections
+discover_plugins()
+ids = {{s.id: s.content for s in render_system_prompt_sections({{}})}}
+print(json.dumps({{"ids": sorted(ids), "text": "\\n".join(ids.values()), "top": "requrv_kb" in sys.modules}}))
+"""
+    out = json.loads(connected.python(code, connected.profile("marketing")))
+    assert out["ids"] == ["requrv-kb.connection", "requrv-kb.proposals"]
+    assert "«marketing»" in out["text"] and "Dai del lei." in out["text"]
+    assert out["top"] is False  # no process-wide module name another profile's copy could shadow

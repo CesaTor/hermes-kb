@@ -166,6 +166,14 @@ def _record(profile: Path, pkg: package.Package, *, preserve_config: bool, **ext
 def _after_copy(profile: Path, conn: kb_connection.Connection) -> None:
     profile_config.seed_provider(profile)
     profile_config.seed_skills_dir(profile, kb_connection.personal_skills_dir(conn))
+    activate_plugin(profile)
+
+
+def activate_plugin(profile: Path) -> None:
+    """Keep this plugin's copy in the bot current and enabled there.
+
+    A gateway already serving the bot loads a new copy when it next re-discovers that profile's
+    plugins (at the latest on restart); a newly installed bot is discovered with it on first use."""
     profile_config.install_plugin_copy(profile)
     profile_config.enable_plugin(profile)
 
@@ -253,7 +261,7 @@ def sync(only: Optional[Path] = None) -> list[dict[str, Any]]:
         for profile in ([only] if only is not None else named_profiles()):
             record = ledger.read(profile)
             if record and record.get("source"):
-                profile_config.install_plugin_copy(profile)  # a plugin update reaches every bot
+                activate_plugin(profile)  # a plugin update reaches every bot
                 results.append(_sync_profile(profile, record, conn))
     return results
 
