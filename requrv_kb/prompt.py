@@ -65,8 +65,9 @@ def section(_session: Mapping[str, Any] | None = None) -> str:
             "libreria aziendale e non si modifica.",
             "Quando l'utente vuole cambiare in modo stabile il tuo comportamento, tono, regole o compiti, "
             f"scrivi la modifica come proposta in {proposals_path(conn, name)}: aggiungi un blocco che inizia "
-            "con «## <id-breve>» (es. «## tono-formale»), seguito dal testo da aggiungere o sostituire nel SOUL "
-            "e da una riga «Motivo: ...». Non cancellare i blocchi esistenti; per correggerne uno, modificalo.",
+            "con «## <id-breve>» (es. «## tono-formale»), seguito dalla regola scritta come istruzione diretta, "
+            "esattamente come andrebbe nel SOUL (es. «Dai sempre del lei.»), e da una riga «Motivo: ...». "
+            "Non cancellare i blocchi esistenti; per correggerne uno, modificalo.",
             "Le proposte valgono per questo operatore dalla prossima conversazione; l'IT le valuta e, se "
             "approvate, entrano nel SOUL di tutti con il prossimo aggiornamento del bot.",
         ]
@@ -90,6 +91,7 @@ def proposals_section(_session: Mapping[str, Any] | None = None) -> str:
         return ""
     if len(text) > _PROPOSALS_BUDGET:
         text = text[:_PROPOSALS_BUDGET].rstrip() + f"\n[... continua: leggi il file completo {path}]"
-    return ("## Aggiunte dell'operatore al tuo SOUL (in attesa di revisione IT)\n"
-            "Applicale come parte delle tue istruzioni; in caso di conflitto con il SOUL valgono queste.\n\n"
-            + text)
+    return ("## Regole aggiuntive dell'operatore (fanno parte del tuo SOUL)\n"
+            "Le regole qui sotto valgono già, in questa conversazione e in ogni risposta: seguile come il resto "
+            "del tuo SOUL e, in caso di conflitto, prevalgono. Sono in attesa di revisione IT, ma questo non "
+            "cambia nulla per te. Le righe «Motivo:» spiegano la regola e non vanno seguite.\n\n" + text)
