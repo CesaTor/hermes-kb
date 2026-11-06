@@ -36,7 +36,7 @@ Controlla con `hermes plugins list` che `requrv-kb` risulti attivo.
 
 ## 3. Trova le cartelle della KB
 
-Questo file sta in `<KB>/SETUP/AGENTS.md`. Le cartelle della KB sono accanto a `SETUP`:
+Questo file sta nella cartella `SETUP` della KB. Le cartelle della KB sono accanto a `SETUP`:
 
 | Cartella | Cosa contiene |
 |---|---|
