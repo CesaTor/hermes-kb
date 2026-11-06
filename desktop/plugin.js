@@ -1,27 +1,9 @@
 // ReQurv KB - Desktop half. Loaded uncompiled as plain ESM: no JSX, no TypeScript.
-import {
-  Badge,
-  Button,
-  Codicon,
-  ConfirmDialog,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Input,
-  PALETTE_AREA,
-  ROUTES_AREA,
-  SIDEBAR_NAV_AREA,
-  cn,
-  haptic,
-  host
-} from '@hermes/plugin-sdk'
+// One screen, Settings -> Plugins -> ReQurv KB: the connection, the watchdog and its last results.
+import { Badge, Button, Codicon, ConfirmDialog, Input, cn, haptic, host } from '@hermes/plugin-sdk'
 import { useCallback, useEffect, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const PAGE_PATH = '/requrv-kb'
 const MUTED = 'text-(--ui-text-tertiary)'
 
 // ---------------------------------------------------------------- helpers
@@ -50,16 +32,11 @@ function createApi(ctx) {
     connection: () => ctx.rest('/connection'),
     connect: body => post('/connection', body),
     disconnect: () => ctx.rest('/connection', { method: 'DELETE' }),
-    library: () => ctx.rest('/library'),
-    install: name => post('/library/install', { name }),
-    update: profile => post('/library/update', { profile }),
-    rollback: profile => post('/library/rollback', { profile }),
-    duplicate: (profile, name) => post('/library/duplicate', { profile, name }),
-    sync: () => post('/library/sync', {})
+    watchdog: () => ctx.rest('/watchdog'),
+    setInterval: minutes => post('/watchdog', { minutes }),
+    reconcile: () => post('/watchdog/reconcile', {})
   }
 }
-
-const countUpdated = results => (results || []).filter(r => r.status === 'updated').length
 
 const h = (tag, props, ...children) =>
   jsx(tag, { ...props, children: children.length === 1 ? children[0] : children })
@@ -93,17 +70,6 @@ function CheckNotes({ check }) {
     ...problems.map((p, i) => h(Note, { key: `p${i}`, tone: 'error' }, p)),
     ...warnings.map((w, i) => h(Note, { key: `w${i}`, tone: 'warn' }, w))
   ])
-}
-
-function StatusBadge({ entry }) {
-  const { status } = entry
-  if (status === 'installed') return h(Badge, { variant: 'success' }, 'Installato')
-  if (status === 'update') {
-    const label = `Aggiornamento disponibile v${entry.installed_version || '?'} → v${entry.version}`
-    return h(Badge, { variant: 'warn' }, label)
-  }
-  if (status === 'error') return h(Badge, { variant: 'destructive' }, 'Errore')
-  return h(Badge, { variant: 'default' }, 'Nuovo')
 }
 
 // ----------------------------------------------------------- connect form
@@ -198,187 +164,118 @@ function ConnectForm({ ctx, api, initial, check, onConnected, onCancel }) {
   ])
 }
 
-// ---------------------------------------------------------------- library
+// --------------------------------------------------------------- watchdog
 
-function DuplicateDialog({ entry, onClose, onSubmit }) {
-  const [name, setName] = useState(entry ? `${entry.name}-personale` : '')
+const ACTION = {
+  installed: { label: 'installato', variant: 'success' },
+  updated: { label: 'aggiornato', variant: 'success' },
+  error: { label: 'errore', variant: 'destructive' },
+  'source-unavailable': { label: 'sorgente non disponibile', variant: 'destructive' },
+  'pending-removal': { label: 'non più abilitato, sarà rimosso', variant: 'default' },
+  removed: { label: 'rimosso (non più abilitato)', variant: 'default' }
+}
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
+
+function whenText(epochSeconds) {
+  return new Date(epochSeconds * 1000).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+/** Toast after a manual or launch-time check; null when there is nothing worth saying. */
+function summarize(res) {
+  if (res.busy) return info('Un controllo è già in corso su questo computer.')
+  const run = res.last_run
+  if (!run) return null
+  const s = run.summary
+  if (run.error) return host.notify({ kind: 'error', message: run.error })
+  if (s.installed || s.updated || s.removed) {
+    const parts = []
+    if (s.installed) parts.push(`${plural(s.installed, 'bot installato', 'bot installati')}`)
+    if (s.updated) parts.push(`${plural(s.updated, 'bot aggiornato', 'bot aggiornati')}`)
+    if (s.removed) parts.push(`${plural(s.removed, 'bot rimosso', 'bot rimossi')}`)
+    ok(`${parts.join(' e ')} dalla libreria.`)
+  }
+  for (const r of run.results.filter(r => r.action === 'error' || r.action === 'source-unavailable')) {
+    host.notify({ kind: 'error', message: `${r.bot}: ${r.error || ACTION[r.action].label}` })
+  }
+  return null
+}
+
+function ResultRows({ run }) {
+  const rows = run.results.filter(r => r.action !== 'unchanged')
+  if (!rows.length) return h(Note, {}, 'Tutti i bot sono allineati alla libreria.')
+  return hs('div', { className: 'flex flex-col gap-1' }, rows.map((r, i) => {
+    const meta = ACTION[r.action] || { label: r.action, variant: 'default' }
+    const version = r.to && r.action !== 'error' ? ` v${r.to}` : ''
+    return hs('div', { key: i, className: 'flex flex-wrap items-center gap-2 text-xs' }, [
+      h('span', { className: 'font-medium text-(--ui-text-primary)' }, r.bot),
+      h(Badge, { variant: meta.variant }, meta.label + version),
+      r.error ? h('span', { className: 'text-destructive' }, r.error) : null
+    ])
+  }))
+}
+
+function WatchdogSection({ api, status, onChanged }) {
+  const [minutes, setMinutes] = useState(String(status.interval_minutes))
   const [busy, setBusy] = useState(false)
+  const run = status.last_run
+  const s = run && run.summary
 
-  const submit = async () => {
-    if (!name.trim() || busy) return
+  const check = async () => {
+    haptic('tap')
     setBusy(true)
     try {
-      await onSubmit(name.trim())
+      const res = await api.reconcile()
+      summarize(res)
+      await onChanged()
+    } catch (e) {
+      fail(e)
     } finally {
       setBusy(false)
     }
   }
 
-  return h(Dialog, { open: true, onOpenChange: open => !open && !busy && onClose() },
-    hs(DialogContent, {}, [
-      hs(DialogHeader, {}, [
-        h(DialogTitle, {}, 'Duplica come bot personale'),
-        h(DialogDescription, {}, `Crea una copia modificabile di "${entry.name}". La copia non viene più aggiornata dalla KB.`)
-      ]),
-      h(Input, {
-        autoFocus: true,
-        value: name,
-        onChange: e => setName(e.target.value),
-        onKeyDown: e => e.key === 'Enter' && submit()
-      }),
-      hs(DialogFooter, {}, [
-        h(Button, { variant: 'ghost', disabled: busy, onClick: onClose }, 'Annulla'),
-        h(Button, { disabled: busy || !name.trim(), loading: busy, onClick: submit }, 'Duplica')
-      ])
-    ]))
-}
-
-function EntryActions({ entry, busy, onInstall, onUpdate, onRollback, onDuplicate }) {
-  const buttons = []
-  if (entry.status === 'new') {
-    buttons.push(h(Button, { key: 'i', size: 'sm', disabled: busy, loading: busy, onClick: onInstall }, 'Installa'))
-  }
-  if (entry.status === 'update') {
-    buttons.push(h(Button, { key: 'u', size: 'sm', disabled: busy, loading: busy, onClick: onUpdate }, 'Aggiorna'))
-  }
-  if (entry.can_rollback) {
-    buttons.push(h(Button, { key: 'r', size: 'sm', variant: 'outline', disabled: busy, onClick: onRollback },
-      'Torna alla versione precedente'))
-  }
-  if (entry.installed_profile) {
-    buttons.push(h(Button, { key: 'd', size: 'sm', variant: 'secondary', disabled: busy, onClick: onDuplicate },
-      'Duplica come bot personale'))
-  }
-  return buttons.length ? hs('div', { className: 'flex flex-wrap gap-2' }, buttons) : null
-}
-
-function EntryCard({ entry, busy, actions }) {
-  const skills = (entry.skills || []).length
-  return hs('div', {
-    className: 'flex flex-col gap-2 rounded-md p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ui-stroke-secondary)_50%,transparent)]'
-  }, [
-    hs('div', { className: 'flex flex-wrap items-center gap-2' }, [
-      h('span', { className: 'text-sm font-medium text-(--ui-text-primary)' }, entry.name),
-      h('span', { className: cn('text-xs', MUTED) }, `v${entry.version}`),
-      h(StatusBadge, { entry })
-    ]),
-    entry.description ? h('div', { className: 'text-xs text-(--ui-text-secondary)' }, entry.description) : null,
-    h(Note, {}, `${skills} ${skills === 1 ? 'competenza' : 'competenze'}${entry.has_cron ? ' · con attività pianificate' : ''}`),
-    entry.status === 'error' && entry.error ? h(Note, { tone: 'error' }, entry.error) : null,
-    entry.installed_profile
-      ? h(Note, {}, 'Bot di libreria: non modificabile, viene aggiornato dalla KB.')
-      : null,
-    actions
-  ])
-}
-
-function AllowlistNotes({ allowlist, empty }) {
-  const al = allowlist || {}
-  const notes = []
-  if (empty) {
-    notes.push(h(Note, { key: 'e' }, 'La libreria non ti offre bot: chiedi all’IT di abilitarli nel bots.yaml della tua area.'))
-  }
-  if ((al.missing || []).length) {
-    notes.push(h(Note, { key: 'm', tone: 'warn' }, `Bot abilitati ma non trovati nella KB: ${al.missing.join(', ')}.`))
-  }
-  if ((al.unreadable || []).length) {
-    notes.push(h(Note, { key: 'u', tone: 'warn' }, `Elenchi non leggibili: ${al.unreadable.join(', ')}.`))
-  }
-  return notes.length ? hs('div', { className: 'flex flex-col gap-1' }, notes) : null
-}
-
-const SYNC_LABEL = { unchanged: null, updated: 'aggiornato', 'source-unavailable': 'sorgente non disponibile', error: 'errore' }
-
-function summarizeSync(results) {
-  const rows = results || []
-  if (!rows.length) return info('Nessun bot di libreria da aggiornare.')
-  const updated = countUpdated(rows)
-  const problems = rows.filter(r => r.status === 'error' || r.status === 'source-unavailable')
-  if (updated) ok(updated === 1 ? "Aggiornato 1 bot dalla libreria." : `Aggiornati ${updated} bot dalla libreria.`)
-  else if (!problems.length) info('Tutti i bot sono già aggiornati.')
-  for (const r of problems) {
-    host.notify({ kind: 'error', message: `${r.profile}: ${r.error || SYNC_LABEL[r.status]}` })
-  }
-}
-
-function Library({ api, data, busyKey, onChanged, setBusyKey }) {
-  const [confirm, setConfirm] = useState(null)
-  const [dup, setDup] = useState(null)
-  const entries = data.entries || []
-
-  const run = async (key, work, message) => {
-    haptic('tap')
-    setBusyKey(key)
+  const save = async () => {
     try {
-      await work()
-      ok(message)
+      await api.setInterval(Number(minutes))
+      ok('Intervallo salvato.')
       await onChanged()
     } catch (e) {
       fail(e)
-    } finally {
-      setBusyKey('')
     }
   }
 
-  const appears = 'Lo trovi nella sezione Bot.'
-
-  return hs('div', { className: 'flex flex-col gap-3' }, [
-    h(AllowlistNotes, { allowlist: data.allowlist, empty: !entries.length }),
-    ...entries.map(entry => {
-      const key = entry.installed_profile || entry.name
-      return h(EntryCard, {
-        key: entry.name,
-        entry,
-        busy: busyKey === key,
-        actions: h(EntryActions, {
-          entry,
-          busy: Boolean(busyKey),
-          onInstall: () => run(key, () => api.install(entry.name), `${entry.name} installato. ${appears}`),
-          onUpdate: () => run(key, () => api.update(entry.installed_profile), `${entry.name} aggiornato.`),
-          onRollback: () => setConfirm(entry),
-          onDuplicate: () => setDup(entry)
-        })
-      })
-    }),
-    confirm
-      ? h(ConfirmDialog, {
-          open: true,
-          destructive: true,
-          title: 'Tornare alla versione precedente?',
-          description: `Il bot "${confirm.name}" tornerà alla versione precedente. Potrai aggiornarlo di nuovo dalla libreria.`,
-          confirmLabel: 'Torna indietro',
-          cancelLabel: 'Annulla',
-          onClose: () => setConfirm(null),
-          onConfirm: async () => {
-            const entry = confirm
-            await run(entry.installed_profile, () => api.rollback(entry.installed_profile),
-              `${entry.name} riportato alla versione precedente.`)
-          }
-        })
-      : null,
-    dup
-      ? h(DuplicateDialog, {
-          entry: dup,
-          onClose: () => setDup(null),
-          onSubmit: async name => {
-            const entry = dup
-            try {
-              await api.duplicate(entry.installed_profile, name)
-              ok(`Creato "${name}". ${appears}`)
-              setDup(null)
-              await onChanged()
-            } catch (e) {
-              fail(e)
-            }
-          }
-        })
-      : null
-  ])
+  return h(Section, { title: 'Allineamento automatico' },
+    hs('div', { className: 'flex flex-col gap-3' }, [
+      h(Note, {}, 'Mentre Hermes è aperto, la libreria viene controllata a intervalli: i bot con una nuova versione si '
+        + 'aggiornano, quelli abilitati ma mancanti (eliminati o mai installati) tornano senza le loro chat, e i bot '
+        + 'aziendali non più abilitati vengono rimossi con chat e memoria. I bot che hai creato o duplicato restano.'),
+      hs('div', { className: 'flex flex-wrap items-center gap-2' }, [
+        h('span', { className: 'text-xs text-(--ui-text-secondary)' }, 'Controlla ogni'),
+        h(Input, {
+          className: 'w-20', type: 'number', min: status.min_minutes, value: minutes,
+          'aria-label': 'Minuti tra due controlli', onChange: e => setMinutes(e.target.value)
+        }),
+        h('span', { className: 'text-xs text-(--ui-text-secondary)' }, 'minuti'),
+        h(Button, {
+          size: 'sm', variant: 'secondary', disabled: busy || Number(minutes) === status.interval_minutes, onClick: save
+        }, 'Salva')
+      ]),
+      run
+        ? hs('div', { className: 'flex flex-col gap-2' }, [
+            h(Note, {}, `Ultimo controllo: ${whenText(run.at)} · ${plural(s.installed, 'installato', 'installati')}, `
+              + `${plural(s.updated, 'aggiornato', 'aggiornati')}, ${plural(s.removed, 'rimosso', 'rimossi')}, ${plural(s.errors, 'errore', 'errori')}`),
+            run.error ? h(Note, { tone: 'error' }, run.error) : h(ResultRows, { run })
+          ])
+        : h(Note, {}, 'Nessun controllo eseguito finora.'),
+      h('div', {}, h(Button, { size: 'sm', disabled: busy, loading: busy, onClick: check },
+        busy ? 'Controllo in corso…' : 'Controlla ora'))
+    ]))
 }
 
-// ------------------------------------------------------------------- page
+// --------------------------------------------------------------- settings
 
-function ConnectionHeader({ connection, onEdit, onDisconnect, disabled }) {
+function ConnectionHeader({ connection, onEdit, onDisconnect }) {
   const roots = connection.roots || []
   return hs('div', { className: 'flex flex-wrap items-start justify-between gap-3' }, [
     hs('div', { className: 'flex min-w-0 flex-col gap-1' }, [
@@ -387,24 +284,22 @@ function ConnectionHeader({ connection, onEdit, onDisconnect, disabled }) {
       connection.personal ? h(Note, {}, `Cartella personale: ${connection.personal}`) : null
     ]),
     hs('div', { className: 'flex gap-2' }, [
-      h(Button, { size: 'sm', variant: 'secondary', disabled, onClick: onEdit }, 'Modifica collegamento'),
-      h(Button, { size: 'sm', variant: 'outline', disabled, onClick: onDisconnect }, 'Scollega')
+      h(Button, { size: 'sm', variant: 'secondary', onClick: onEdit }, 'Modifica collegamento'),
+      h(Button, { size: 'sm', variant: 'outline', onClick: onDisconnect }, 'Scollega')
     ])
   ])
 }
 
-function KbPage({ ctx, api }) {
+function SettingsPage({ ctx, api }) {
   const [state, setState] = useState({ loading: true })
   const [editing, setEditing] = useState(false)
-  const [busyKey, setBusyKey] = useState('')
-  const [syncing, setSyncing] = useState(false)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
 
   const load = useCallback(async () => {
     try {
       const conn = await api.connection()
-      const data = conn.connection ? await api.library() : null
-      setState({ conn, data })
+      const status = conn.connection ? await api.watchdog() : null
+      setState({ conn, status })
     } catch (e) {
       setState({ error: errText(e) })
     }
@@ -413,18 +308,6 @@ function KbPage({ ctx, api }) {
   useEffect(() => {
     void load()
   }, [load])
-
-  const syncAll = async () => {
-    setSyncing(true)
-    try {
-      summarizeSync((await api.sync()).results)
-      await load()
-    } catch (e) {
-      fail(e)
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   let body
   if (state.loading) {
@@ -444,20 +327,14 @@ function KbPage({ ctx, api }) {
       onConnected: () => { setEditing(false); void load() }
     })
   } else {
-    body = hs('div', { className: 'flex flex-col gap-4' }, [
+    body = hs('div', { className: 'flex flex-col gap-6' }, [
       h(ConnectionHeader, {
         connection: state.conn.connection,
-        disabled: Boolean(busyKey) || syncing,
         onEdit: () => setEditing(true),
         onDisconnect: () => setConfirmDisconnect(true)
       }),
       h(CheckNotes, { check: state.conn.check }),
-      hs('div', { className: 'flex items-center justify-between' }, [
-        h('h2', { className: 'text-sm font-semibold text-(--ui-text-primary)' }, 'Bot disponibili'),
-        h(Button, { size: 'sm', variant: 'secondary', disabled: syncing || Boolean(busyKey), loading: syncing, onClick: syncAll },
-          'Aggiorna tutti')
-      ]),
-      state.data ? h(Library, { api, data: state.data, busyKey, setBusyKey, onChanged: load }) : null,
+      state.status ? h(WatchdogSection, { key: state.status.last_run?.at ?? 'none', api, status: state.status, onChanged: load }) : null,
       confirmDisconnect
         ? h(ConfirmDialog, {
             open: true,
@@ -477,33 +354,12 @@ function KbPage({ ctx, api }) {
     ])
   }
 
-  return hs('div', { className: 'flex h-full flex-col gap-4 overflow-y-auto p-6' }, [
+  return hs('div', { className: 'flex max-w-xl flex-col gap-4 p-4' }, [
     hs('div', { className: 'flex items-center gap-2' }, [
       h(Codicon, { name: 'library' }),
-      h('h1', { className: 'text-base font-semibold text-(--ui-text-primary)' }, 'Libreria bot')
+      h('h1', { className: 'text-base font-semibold text-(--ui-text-primary)' }, 'ReQurv KB')
     ]),
     body
-  ])
-}
-
-// --------------------------------------------------------------- settings
-
-function SettingsPage({ api }) {
-  const [conn, setConn] = useState(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    api.connection().then(setConn, e => setError(errText(e)))
-  }, [api])
-
-  const c = conn && conn.connection
-  let summary = 'Caricamento…'
-  if (error) summary = error
-  else if (conn) summary = c ? `Collegata a ${(c.roots || []).length} cartella/e${c.operator ? ` · operatore ${c.operator}` : ''}.` : 'KB non collegata.'
-
-  return hs('div', { className: 'flex max-w-xl flex-col gap-3 p-4' }, [
-    h('div', { className: 'text-sm text-(--ui-text-secondary)' }, summary),
-    h('div', {}, h(Button, { size: 'sm', onClick: () => host.navigate(PAGE_PATH) }, 'Apri la libreria bot'))
   ])
 }
 
@@ -515,35 +371,19 @@ export default {
   register(ctx) {
     const api = createApi(ctx)
 
-    ctx.registerMany([
-      { id: 'page', area: ROUTES_AREA, data: { path: PAGE_PATH }, render: () => jsx(KbPage, { ctx, api }) },
-      { id: 'nav', area: SIDEBAR_NAV_AREA, data: { path: PAGE_PATH, label: 'Libreria', codicon: 'library' } },
-      {
-        id: 'open',
-        area: PALETTE_AREA,
-        data: {
-          id: 'requrv-kb.open',
-          label: 'Apri la libreria bot',
-          keywords: ['libreria', 'bot', 'kb', 'requrv'],
-          run: () => host.navigate(PAGE_PATH)
-        }
-      }
-    ])
-
     ctx.registerSettingsPage?.({
       id: 'settings',
       title: 'ReQurv KB',
       icon: 'library',
-      render: () => jsx(SettingsPage, { api })
+      render: () => jsx(SettingsPage, { ctx, api })
     })
 
-    // Launch-time sync: fire-and-forget, never blocks registration.
+    // Launch-time check (installs what is missing, updates the rest): fire-and-forget, never blocks registration.
     api
-      .sync()
+      .reconcile()
       .then(res => {
-        const n = countUpdated(res && res.results)
-        if (n) info(n === 1 ? "Aggiornato 1 bot dalla libreria." : `Aggiornati ${n} bot dalla libreria.`)
+        if (!res.busy) summarize(res)
       })
-      .catch(e => console.warn('[requrv-kb] sync all’avvio non riuscita:', errText(e)))
+      .catch(e => console.warn('[requrv-kb] controllo all’avvio non riuscito:', errText(e)))
   }
 }

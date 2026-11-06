@@ -29,6 +29,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     sub.add_parser("list", help="Elenca i bot che la libreria ti offre")
     sub.add_parser("status", help="Elenca i bot di libreria installati")
     sub.add_parser("sync", help="Aggiorna tutti i bot di libreria")
+    sub.add_parser("reconcile", help="Installa i bot abilitati che mancano e aggiorna gli altri (come il controllo automatico)")
     for action, text in (("install", "Installa un bot"), ("update", "Aggiorna un bot"),
                          ("rollback", "Torna alla versione precedente di un bot")):
         sub.add_parser(action, help=text).add_argument("bot")
@@ -58,6 +59,7 @@ _ACTIONS: dict[str, Callable[[Any], Any]] = {
     "list": lambda a: library.catalog(),
     "status": lambda a: {"bots": library.status()},
     "sync": lambda a: {"results": library.sync()},
+    "reconcile": lambda a: {"results": library.reconcile()},
     "install": lambda a: library.install(a.bot),
     "update": lambda a: library.update(a.bot),
     "rollback": lambda a: library.rollback(a.bot),
@@ -81,6 +83,9 @@ def _text(action: str, result: dict[str, Any]) -> str:
     if action == "sync":
         return "\n".join(f"{r['profile']:<24} {r['status']}" + (f"  {r['to']}" if r["status"] == "updated" else "")
                          for r in result["results"]) or "Nessun bot di libreria."
+    if action == "reconcile":
+        return "\n".join(f"{r['profile']:<24} {r['action']}" + (f"  {r['to']}" if r["action"] in {"installed", "updated"} else "")
+                         + (f"  {r['error']}" if r.get("error") else "") for r in result["results"]) or "Nessun bot di libreria."
     if action in {"install", "update", "rollback"}:
         return f"{result['profile']}: versione {result['version']}. Vale dalla prossima conversazione."
     if action == "duplicate":

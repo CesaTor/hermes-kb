@@ -22,7 +22,8 @@ from uuid import uuid4
 
 from . import connection as kb_connection
 from . import hermes, ledger, package, profile_config
-from .paths import KBError, atomic_write_text, named_profiles, profile_dir, valid_profile_name
+from .paths import (KBError, atomic_write_text, data_dir, deletion_marker, named_profiles, profile_dir, read_json,
+                    valid_profile_name, write_json)
 from .yamlio import safe_load
 
 _LOCK = threading.RLock()
@@ -178,18 +179,51 @@ def activate_plugin(profile: Path) -> None:
     profile_config.enable_plugin(profile)
 
 
+def _clear_deleted_remains(target: Path) -> bool:
+    """Prepare *target* for a bot Hermes deleted; True when the name carries a deletion marker.
+
+    Deleting a bot removes its profile folder with the ledger and backups inside, so what comes
+    back is a fresh bot. Remains of a delete that failed half way (a locked file) are cleared here;
+    a folder Hermes never deleted is somebody's bot and is left alone."""
+    deleted = deletion_marker(target.name).exists()
+    if target.exists():
+        if not deleted:
+            raise KBError(f"Esiste già un bot chiamato «{target.name}» su questo computer.")
+        try:
+            shutil.rmtree(target)
+        except OSError as exc:
+            raise KBError(f"Non riesco a ripulire i resti del bot «{target.name}» eliminato: "
+                          "chiudi Hermes e riprova.") from exc
+    return deleted
+
+
+def _install(pkg: package.Package, conn: kb_connection.Connection) -> dict[str, Any]:
+    package.assert_installable(pkg)
+    target = profile_dir(pkg.name)
+    redo = _clear_deleted_remains(target)
+    args = ["profile", "install", str(pkg.folder), "--name", pkg.name, "--yes"]
+    if redo:
+        # Only `profile create` clears the deletion marker, and install then needs --force over its shell.
+        hermes.run(["profile", "create", pkg.name, "--no-alias"])
+        args.append("--force")
+    try:
+        hermes.run(args)
+    except KBError:
+        if redo:  # do not strand an empty bot that would block every later attempt
+            try:
+                hermes.run(["profile", "delete", pkg.name, "--yes"])
+            except KBError:
+                pass
+        raise
+    _record(target, pkg, preserve_config=False)
+    _after_copy(target, conn)
+    return {"profile": pkg.name, "version": pkg.version, "from_version": None}
+
+
 def install(name: str) -> dict[str, Any]:
     with _LOCK:
         conn = _require_connection()
-        pkg = _offered(name)
-        package.assert_installable(pkg)
-        target = profile_dir(pkg.name)
-        if target.exists():
-            raise KBError(f"Esiste già un bot chiamato «{pkg.name}» su questo computer.")
-        hermes.run(["profile", "install", str(pkg.folder), "--name", pkg.name, "--yes"])
-        _record(target, pkg, preserve_config=False)
-        _after_copy(target, conn)
-    return {"profile": pkg.name, "version": pkg.version, "from_version": None}
+        return _install(_offered(name), conn)
 
 
 def _library_profile(profile_name: str) -> tuple[Path, dict[str, Any]]:
@@ -263,6 +297,89 @@ def sync(only: Optional[Path] = None) -> list[dict[str, Any]]:
             if record and record.get("source"):
                 activate_plugin(profile)  # a plugin update reaches every bot
                 results.append(_sync_profile(profile, record, conn))
+    return results
+
+
+def _outcome(bot: str, profile: str, action: str, **extra: Any) -> dict[str, Any]:
+    return {"bot": bot, "profile": profile, "action": action, **{k: v for k, v in extra.items() if v is not None}}
+
+
+def _named_allowed(lists: dict[str, Any], name: str) -> bool:
+    return lists["wildcard"] or name in lists["allowed"]
+
+
+def _pending_path() -> Path:
+    return data_dir() / "watchdog" / "pending-removal.json"
+
+
+def _removal_is_safe(conn: kb_connection.Connection, lists: dict[str, Any]) -> bool:
+    """Whether "this bot is not in the library" can be trusted: every folder was read, every list parsed.
+
+    An offline drive or a folder not yet downloaded looks exactly like a library that dropped a bot,
+    so any doubt (unreadable root, list or area, files not downloaded, no area list at all) means no removal."""
+    return kb_connection.check(conn).ok and not lists["unreadable"] and bool(lists["areas"])
+
+
+def _remove_not_allowed(profile: Path, bot: str, version: Any, pending: set[str], strikes: set[str]) -> dict[str, Any]:
+    """Two strikes in a row, then Hermes' own ``profile delete`` (chats and memory go with the bot)."""
+    strikes.add(profile.name)
+    if profile.name not in pending:
+        return _outcome(bot, profile.name, "pending-removal", **{"from": version})
+    try:
+        hermes.run(["profile", "delete", profile.name, "--yes"])
+    except KBError as exc:  # e.g. the bot is in use: try again at the next pass
+        return _outcome(bot, profile.name, "pending-removal", **{"from": version}, error=str(exc))
+    strikes.discard(profile.name)
+    return _outcome(bot, profile.name, "removed", **{"from": version})
+
+
+def reconcile() -> list[dict[str, Any]]:
+    """Bring this computer in line with the library: install what the areas allow and is missing
+    (deleted by the user, or never installed), update the installed bots, and remove library bots
+    the areas no longer allow.
+
+    Only profiles carrying the library ledger are ever removed (bots the user created or duplicated
+    have none), only when every folder and list was read, and only on the second pass in a row that
+    finds them not allowed. Results are ``{bot, profile, action, from?, to?, error?}`` with ``action``
+    one of ``installed``, ``updated``, ``unchanged``, ``error``, ``source-unavailable``,
+    ``pending-removal``, ``removed``."""
+    results: list[dict[str, Any]] = []
+    conn = kb_connection.load()
+    if conn is None:
+        return results
+    with _LOCK:
+        lists = read_allowlists(conn)
+        entries = catalog()["entries"]
+        installed = _installed()
+        listed = {os.path.normcase(e["source"]) for e in entries if e["status"] != "error"}
+        broken = {os.path.normcase(e["source"]) for e in entries if e["status"] == "error"}
+        present = {profile.name for profile, _ in installed.values()}
+        for entry in entries:
+            name = entry["name"]
+            if entry["status"] == "error":
+                if _named_allowed(lists, name):
+                    results.append(_outcome(name, name, "error", error=entry["error"]))
+            elif entry["status"] == "new" and name not in present:  # present under another source: the sync below
+                try:
+                    done = _install(package.read(Path(entry["source"])), conn)
+                    results.append(_outcome(name, name, "installed", to=done["version"]))
+                except (KBError, OSError) as exc:
+                    results.append(_outcome(name, name, "error", error=str(exc)))
+        safe = _removal_is_safe(conn, lists)
+        pending = set(read_json(_pending_path()) or [])
+        strikes: set[str] = set() if safe else set(pending)  # an unsure pass neither adds nor clears strikes
+        for source, (profile, record) in installed.items():
+            bot = str(record.get("bot") or profile.name)
+            gone = source not in listed and source not in broken and Path(str(record["source"])).is_dir()
+            if gone and safe:
+                results.append(_remove_not_allowed(profile, bot, record.get("version"), pending, strikes))
+                continue
+            if gone:
+                continue
+            for done in sync(only=profile):
+                results.append(_outcome(bot, profile.name, done["status"], **{"from": done["from"], "to": done["to"]},
+                                        error=done.get("error")))
+        write_json(_pending_path(), sorted(strikes))
     return results
 
 

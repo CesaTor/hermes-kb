@@ -31,10 +31,10 @@ def _load_service():
         sys.modules[name] = module
         spec.loader.exec_module(module)
     return (importlib.import_module(f"{name}.connection"), importlib.import_module(f"{name}.library"),
-            importlib.import_module(f"{name}.paths").KBError)
+            importlib.import_module(f"{name}.watchdog"), importlib.import_module(f"{name}.paths").KBError)
 
 
-kb_connection, library, KBError = _load_service()
+kb_connection, library, watchdog, KBError = _load_service()
 
 router = APIRouter()
 
@@ -58,6 +58,10 @@ class NameBody(BaseModel):
 
 class ProfileBody(BaseModel):
     profile: str
+
+
+class WatchdogBody(BaseModel):
+    minutes: int
 
 
 class DuplicateBody(BaseModel):
@@ -130,3 +134,31 @@ async def sync():
 @router.post("/library/duplicate")
 async def duplicate(body: DuplicateBody):
     return await _call(library.duplicate, body.profile, body.name)
+
+
+def _watchdog_set(body: WatchdogBody) -> dict[str, Any]:
+    kb_connection.set_watchdog_minutes(body.minutes)
+    return watchdog.status()
+
+
+def _reconcile_now() -> dict[str, Any]:
+    """Check now, whatever the interval; ``busy`` when another process holds the machine-wide lease."""
+    if kb_connection.load() is None:
+        raise KBError("Questo computer non è ancora collegato alla KB.")
+    record = watchdog.run(force=True)
+    return {"busy": record is None, **watchdog.status()}
+
+
+@router.get("/watchdog")
+async def get_watchdog():
+    return await _call(watchdog.status)
+
+
+@router.post("/watchdog")
+async def post_watchdog(body: WatchdogBody):
+    return await _call(_watchdog_set, body)
+
+
+@router.post("/watchdog/reconcile")
+async def post_reconcile():
+    return await _call(_reconcile_now)

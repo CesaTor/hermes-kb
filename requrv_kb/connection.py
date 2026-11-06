@@ -10,7 +10,7 @@ operator's personal folder. Nothing here enforces access: the cloud account does
 from __future__ import annotations
 
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -21,6 +21,9 @@ from .paths import KBError, read_json, settings_path, write_json
 LIBRARY_DIRNAME = "Biblioteca-Agenti"
 OPERATORS_DIRNAME = "Operatori"
 SYSTEM_DIRNAME = "90-Sistema"
+DEFAULT_WATCHDOG_MINUTES = 30
+MIN_WATCHDOG_MINUTES = 5
+MAX_WATCHDOG_MINUTES = 24 * 60
 _WINDOWS_RESERVED = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
                      *(f"lpt{i}" for i in range(1, 10))}
 
@@ -31,6 +34,7 @@ class Connection:
     operator: str
     personal: str
     connected_at: str = ""
+    watchdog_minutes: int = DEFAULT_WATCHDOG_MINUTES
 
     def to_dict(self) -> dict[str, Any]:
         return {**asdict(self), "roots": list(self.roots)}
@@ -132,8 +136,15 @@ def _operator_candidates(roots: tuple[str, ...]) -> list[Path]:
     return list(found.values())
 
 
+def valid_watchdog_minutes(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) \
+        and MIN_WATCHDOG_MINUTES <= value <= MAX_WATCHDOG_MINUTES
+
+
 def connect(roots: list[str], operator: Optional[str] = None, personal: Optional[str] = None) -> Connection:
-    """Validate the folders and pick the operator's personal folder; nothing is saved."""
+    """Validate the folders and pick the operator's personal folder; nothing is saved.
+
+    The watchdog interval of an existing connection carries over: it is not part of the folders."""
     if not roots:
         raise KBError("Indica almeno una cartella della KB.")
     resolved: list[str] = []
@@ -165,8 +176,10 @@ def connect(roots: list[str], operator: Optional[str] = None, personal: Optional
         raise KBError("Non riesco a capire qual è la tua cartella personale: indica l'operatore.")
     if not valid_operator(name):
         raise KBError("Il nome dell'operatore deve essere un nome di cartella valido.")
+    previous = load()
     return Connection(resolved_roots, name, str(personal_path),
-                      datetime.now(UTC).isoformat(timespec="seconds"))
+                      datetime.now(UTC).isoformat(timespec="seconds"),
+                      previous.watchdog_minutes if previous else DEFAULT_WATCHDOG_MINUTES)
 
 
 def save(connection: Connection) -> None:
@@ -182,7 +195,22 @@ def load() -> Optional[Connection]:
     if (not isinstance(roots, list) or not roots or not all(isinstance(r, str) for r in roots)
             or not isinstance(operator, str) or not valid_operator(operator) or not isinstance(personal, str)):
         return None
-    return Connection(tuple(roots), operator, personal, str(data.get("connected_at") or ""))
+    minutes = data.get("watchdog_minutes")
+    return Connection(tuple(roots), operator, personal, str(data.get("connected_at") or ""),
+                      minutes if valid_watchdog_minutes(minutes) else DEFAULT_WATCHDOG_MINUTES)
+
+
+def set_watchdog_minutes(minutes: Any) -> Connection:
+    """Change how often the library is checked; refuses an interval the watchdog would not honour."""
+    conn = load()
+    if conn is None:
+        raise KBError("Questo computer non è ancora collegato alla KB.")
+    if not valid_watchdog_minutes(minutes):
+        raise KBError(f"L'intervallo deve essere un numero di minuti tra {MIN_WATCHDOG_MINUTES} e "
+                      f"{MAX_WATCHDOG_MINUTES}.")
+    conn = replace(conn, watchdog_minutes=minutes)
+    save(conn)
+    return conn
 
 
 def disconnect() -> None:

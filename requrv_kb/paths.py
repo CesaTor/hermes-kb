@@ -45,10 +45,19 @@ def profile_dir(name: str) -> Path:
     return profiles_root() / name
 
 
+def deletion_marker(name: str) -> Path:
+    """Where ``hermes profile delete`` records that a named profile was deleted.
+
+    The marker outlives the folder: Hermes ignores a marked profile even if files of it linger, and
+    ``hermes profile create`` is what clears it."""
+    return profiles_root() / ".deleted" / name
+
+
 def named_profiles() -> list[Path]:
     root = profiles_root()
     try:
-        return sorted(p for p in root.iterdir() if p.is_dir() and valid_profile_name(p.name))
+        return sorted(p for p in root.iterdir()
+                      if p.is_dir() and valid_profile_name(p.name) and not deletion_marker(p.name).exists())
     except OSError:
         return []
 
