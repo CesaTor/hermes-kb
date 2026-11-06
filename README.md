@@ -37,8 +37,21 @@ Hive lo fa ReQurv Bridge). Poi, a scelta:
 - **Desktop:** Capabilities → Plugins → Install from Git → `https://github.com/CesaTor/hermes-kb`.
 - **Terminale:** `hermes plugins install CesaTor/hermes-kb --enable`
 
-Poi, una volta sola: riavvia Hermes Desktop e attiva **ReQurv KB** in Capabilities → Plugins (il
-lato Desktop di un plugin parte spento). Aggiornamenti: `hermes plugins update requrv-kb`.
+Installando da Hermes Desktop (link `hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1` oppure
+Install from Git con enable) si accende anche la parte Desktop: riavvia l'app e basta. Solo
+l'installazione da terminale (`hermes plugins install … --enable`) lascia spenta la parte Desktop: per
+usarla, riavvia Hermes Desktop e attiva **ReQurv KB** in Capabilities → Plugins. Aggiornamenti:
+`hermes plugins update requrv-kb`.
+
+**Senza la parte Desktop** funzionano: allineamento automatico (watchdog, ogni 30 minuti mentre Hermes è
+aperto), blocchi dei bot di libreria, percorsi della KB nel prompt, comandi `hermes kb ...` e `/kb ...`,
+skill `requrv-kb:setup`. **Serve la parte Desktop** per: la pagina Impostazioni → Plugin → ReQurv KB, il
+controllo all'avvio dell'app e il layout «ReQurv minimal» (id `requrv-kb:minimal`, applicabile anche dal
+modello con lo strumento `set_theme`).
+
+Per far fare l'installazione a Hermes, `kb-template/SETUP/AGENTS.md` va copiato nella cartella `SETUP`
+della KB: Hermes semplice lo legge e segue i passi (installa il plugin, collega le cartelle, installa i
+bot, applica il layout).
 
 Collega la KB da Impostazioni → Plugin → **ReQurv KB**, oppure:
 

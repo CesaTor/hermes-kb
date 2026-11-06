@@ -363,6 +363,97 @@ function SettingsPage({ ctx, api }) {
   ])
 }
 
+// ----------------------------------------------------------------- layout
+
+// "ReQurv minimal": the saved layout the setup steps apply with set_theme (layout `requrv-kb:minimal`,
+// the id after ctx.register namespaces it). Pane ids are stock Hermes panes.
+const MINIMAL_LAYOUT = {
+  "type": "split",
+  "id": "spl-root",
+  "orientation": "row",
+  "children": [
+    {
+      "type": "group",
+      "id": "grp-sessions",
+      "panes": [
+        "sessions",
+        "hermes-bots:pane"
+      ],
+      "active": "sessions"
+    },
+    {
+      "type": "group",
+      "id": "grp-main",
+      "panes": [
+        "workspace"
+      ],
+      "active": "workspace"
+    },
+    {
+      "type": "group",
+      "id": "g-mw57cwcc-1p",
+      "panes": [
+        "hermes-bots:routines"
+      ],
+      "active": "hermes-bots:routines",
+      "minimized": true
+    },
+    {
+      "type": "split",
+      "id": "spl-right",
+      "orientation": "column",
+      "children": [
+        {
+          "type": "split",
+          "id": "spl-rail",
+          "orientation": "row",
+          "children": [
+            {
+              "type": "group",
+              "id": "grp-review",
+              "panes": [
+                "review"
+              ],
+              "active": "review"
+            },
+            {
+              "type": "group",
+              "id": "grp-files",
+              "panes": [
+                "files"
+              ],
+              "active": "files"
+            }
+          ],
+          "weights": [
+            1,
+            1.2
+          ]
+        },
+        {
+          "type": "group",
+          "id": "grp-terminal",
+          "panes": [
+            "terminal"
+          ],
+          "active": "terminal",
+          "minimized": true
+        }
+      ],
+      "weights": [
+        1.6,
+        1
+      ]
+    }
+  ],
+  "weights": [
+    1,
+    0.85,
+    0.85,
+    1.25
+  ]
+}
+
 // --------------------------------------------------------------- register
 
 export default {
@@ -370,6 +461,8 @@ export default {
   name: 'ReQurv KB',
   register(ctx) {
     const api = createApi(ctx)
+
+    ctx.register({ id: 'minimal', area: 'layouts', title: 'ReQurv minimal', order: 100, data: MINIMAL_LAYOUT })
 
     ctx.registerSettingsPage?.({
       id: 'settings',
