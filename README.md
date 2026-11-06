@@ -21,6 +21,8 @@ configura ReQurv Bridge; il plugin lo copia nei bot che installa.
 | File non scaricati dal cloud rilevati prima di copiare | `requrv_kb/cloud_files.py` |
 | Allineamento automatico: installa i bot abilitati che mancano, aggiorna, rimuove quelli non più consentiti (ogni 30 min, all'avvio, a ogni nuova conversazione); `hermes kb reconcile` | `requrv_kb/watchdog.py`, `requrv_kb/library.py` |
 | Impostazioni → Plugin → **ReQurv KB**: collegamento, intervallo, ultimo controllo, «Controlla ora» (nessuna pagina Libreria) | `desktop/plugin.js` + `dashboard/plugin_api.py` |
+| Tema ReQurv (colori e font Syne incorporati, licenza OFL in `desktop/OFL-syne.txt`), scelto una sola volta alla prima attivazione; «Tema ReQurv» in Impostazioni lo riapplica | `desktop/plugin.js` |
+| Layout `requrv-kb:minimal` e voci del menu laterale nascoste (Messaging, Artifacts, Scheduled jobs, Kanban) | `desktop/plugin.js` |
 | Comandi `hermes kb ...` e `/kb ...` in chat, skill `requrv-kb:setup` | `requrv_kb/cli.py` |
 
 Limiti noti (accettati): le schermate di impostazioni di Hermes non bloccano le modifiche a un bot
@@ -46,8 +48,8 @@ usarla, riavvia Hermes Desktop e attiva **ReQurv KB** in Capabilities → Plugin
 **Senza la parte Desktop** funzionano: allineamento automatico (watchdog, ogni 30 minuti mentre Hermes è
 aperto), blocchi dei bot di libreria, percorsi della KB nel prompt, comandi `hermes kb ...` e `/kb ...`,
 skill `requrv-kb:setup`. **Serve la parte Desktop** per: la pagina Impostazioni → Plugin → ReQurv KB, il
-controllo all'avvio dell'app e il layout «ReQurv minimal» (id `requrv-kb:minimal`, applicabile anche dal
-modello con lo strumento `set_theme`).
+controllo all'avvio dell'app, il tema ReQurv, il layout «ReQurv minimal» (id `requrv-kb:minimal`, applicabile
+anche dal modello con lo strumento `set_theme`) e la scelta delle voci del menu laterale.
 
 Per far fare l'installazione a Hermes, `kb-template/SETUP/AGENTS.md` va copiato nella cartella `SETUP`
 della KB: Hermes semplice lo legge e segue i passi (installa il plugin, collega le cartelle, installa i
@@ -62,6 +64,29 @@ hermes kb install marketing
 ```
 
 I bot installati compaiono nella sezione **Bots**. Le modifiche valgono dalla conversazione successiva.
+
+## Tema e layout (Hermes Desktop)
+
+**Tema.** Il plugin registra il tema «ReQurv» (palette chiara e scura dal sito, font Syne con licenza OFL)
+e lo seleziona **una volta**, alla prima attivazione della parte Desktop; lo ricorda nello storage del
+plugin, quindi chi sceglie poi un altro tema non viene mai sovrascritto. Impostazioni → Plugin →
+ReQurv KB → «Tema ReQurv» lo riapplica. I font sono incorporati in `desktop/plugin.js` (base64) e
+iniettati in un tag `<style>`: un plugin non ha file statici da servire.
+
+**Layout `requrv-kb:minimal`.** Un layout di plugin è solo l'albero dei pannelli; Hermes apre ogni pannello
+che l'albero nomina e un plugin non può dichiarare pannelli «a riposo». L'albero nomina quindi solo:
+Bot (da solo, a sinistra), chat (al centro), Files e Attività pianificate (a destra, come barre chiuse).
+Sessions, revisione e terminale non sono nominati: Hermes li riprende dal layout precedente così come sono.
+
+- Sessions è un pannello che si può solo nascondere e non c'è modo pubblico di nasconderlo da un plugin:
+  riappare come scheda accanto a Bot (l'utente la nasconde dal menu della scheda, clic destro).
+- Revisione e terminale non si aprono (non sono nominati). Possono però comparire come schede nella
+  colonna di sinistra se il layout precedente li teneva in zone proprie; il terminale chiuso resta una
+  scheda inattiva.
+- Files e Attività pianificate restano chiusi solo se Attività pianificate è registrato quando si applica
+  il layout (Bot Mode attivo); altrimenti l'apertura di Files riapre la colonna destra e l'utente le richiude.
+- Voci del menu laterale nascoste (contributo pubblico `sidebarNav.prefs`, finisce se il plugin si spegne):
+  Messaging, Artifacts, Scheduled jobs, Kanban. Restano Nuova sessione e Capabilities (non nascondibile).
 
 ## Allineamento automatico
 

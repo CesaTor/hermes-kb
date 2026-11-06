@@ -77,9 +77,17 @@ reinstalla quelli cancellati e rimuove quelli aziendali non più abilitati.
 
 ## 6. Imposta l'app (solo Hermes Desktop)
 
-Applica il layout ReQurv con lo strumento per l'aspetto dell'app: layout `requrv-kb:minimal`. Se lo
+Il tema ReQurv si applica da solo alla prima apertura dell'app dopo l'installazione; se l'utente ne ha
+scelto un altro, il pulsante «Tema ReQurv» in Impostazioni → Plugin → ReQurv KB lo riapplica. Applica
+poi il layout ReQurv con lo strumento per l'aspetto dell'app: layout `requrv-kb:minimal`. Se lo
 strumento non trova il layout, la parte dell'app del plugin è spenta: chiedi all'utente di accendere
 ReQurv KB in Capabilities → Plugins, riavviare Hermes Desktop e riprovare.
+
+Il layout mostra la sezione Bot a sinistra, la chat al centro e Files e Attività pianificate come
+barre laterali chiuse a destra, e nasconde le voci del menu che non servono (Messaging, Artifacts,
+Scheduled jobs, Kanban). Non può nascondere la scheda Sessions accanto a Bot, né chiudere
+revisione e terminale se erano aperti: restano come li ha l'utente. Avvisalo che può nascondere
+Sessions dal menu della scheda (clic destro).
 
 ## 7. Chiudi
 
