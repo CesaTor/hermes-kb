@@ -1,0 +1,10 @@
+name: knowledge-manager
+version: 0.1.0
+description: "Knowledge Manager: mantiene la wiki aziendale e integra le conoscenze degli operatori."
+author: ReQurv
+license: LicenseRef-ReQurv-Proprietary
+distribution_owned:
+  - distribution.yaml
+  - SOUL.md
+  - skills
+  - README.md

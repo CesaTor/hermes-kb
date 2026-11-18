@@ -127,6 +127,11 @@ def area_dirs(roots: tuple[str, ...]) -> list[Path]:
 
 
 def _operator_candidates(roots: tuple[str, ...]) -> list[Path]:
+    return operator_dirs(roots)
+
+
+def operator_dirs(roots: tuple[str, ...]) -> list[Path]:
+    """Every readable operator folder under the connected roots."""
     found: dict[str, Path] = {}
     for raw in roots:
         root = Path(raw)

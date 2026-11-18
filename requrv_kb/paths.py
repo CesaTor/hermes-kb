@@ -33,6 +33,13 @@ def profiles_root() -> Path:
     return install_root() / "profiles"
 
 
+def active_profile() -> Path:
+    """The profile the current process runs as (the install root for the default profile)."""
+    from hermes_constants import get_hermes_home
+
+    return Path(get_hermes_home())
+
+
 def valid_profile_name(name: str) -> bool:
     return bool(_PROFILE_RE.fullmatch(name or "")) and name != "default"
 

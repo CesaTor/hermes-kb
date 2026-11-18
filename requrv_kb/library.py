@@ -18,18 +18,15 @@ import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional
-from uuid import uuid4
 
 from . import connection as kb_connection
-from . import hermes, ledger, package, profile_config
-from .paths import (KBError, atomic_write_text, data_dir, deletion_marker, named_profiles, profile_dir, read_json,
-                    valid_profile_name, write_json)
+from . import hermes, ledger, package, profile_config, authz, personal
+from .paths import KBError, deletion_marker, named_profiles, profile_dir, valid_profile_name
 from .yamlio import safe_load
 
 _LOCK = threading.RLock()
 ALLOWLIST_FILENAME = "bots.yaml"
 WILDCARD = "*"
-ARCHIVE_DIRNAME = "Archivio"
 
 
 def _require_connection() -> kb_connection.Connection:
@@ -130,6 +127,8 @@ def catalog() -> dict[str, Any]:
             continue
         if not lists["wildcard"] and pkg.name not in lists["allowed"]:
             continue
+        if not authz.permits(conn, pkg.name):
+            continue
         if pkg.name in seen:
             entries.append(_error_entry(folder, KBError(
                 f"Due pacchetti si chiamano «{pkg.name}» ({seen[pkg.name]} e {folder}): rinominane uno.")))
@@ -216,6 +215,7 @@ def _install(pkg: package.Package, conn: kb_connection.Connection) -> dict[str, 
                 pass
         raise
     _record(target, pkg, preserve_config=False)
+    personal.record_install(target, pkg)
     _after_copy(target, conn)
     return {"profile": pkg.name, "version": pkg.version, "from_version": None}
 
@@ -223,6 +223,8 @@ def _install(pkg: package.Package, conn: kb_connection.Connection) -> dict[str, 
 def install(name: str) -> dict[str, Any]:
     with _LOCK:
         conn = _require_connection()
+        if not authz.permits(conn, name):
+            raise KBError(authz.refusal(name))
         return _install(_offered(name), conn)
 
 
@@ -237,13 +239,15 @@ def _library_profile(profile_name: str) -> tuple[Path, dict[str, Any]]:
 def _update(target: Path, record: dict[str, Any], pkg: package.Package, conn: kb_connection.Connection) -> dict[str, Any]:
     package.assert_installable(pkg)
     from_version = str(record.get("version") or "")
+    planned = personal.plan(target, pkg)
     ledger.snapshot(target, from_version, pkg.version, package.owned_paths(pkg, preserve_config=True))
     hermes.run(["profile", "update", target.name, "--yes"])
     profile_config.apply_managed(target, package.staged_config(pkg), pkg.config_managed)
     _record(target, pkg, preserve_config=True)
     _after_copy(target, conn)
-    archive_proposals(pkg, conn)
-    return {"profile": target.name, "version": pkg.version, "from_version": from_version}
+    outcome = personal.apply_after_update(target, pkg, planned, conn)
+    return {"profile": target.name, "version": pkg.version, "from_version": from_version,
+            "reapplied": outcome["reapplied"], "pending": outcome["pending"]}
 
 
 def update(profile_name: str) -> dict[str, Any]:
@@ -266,19 +270,30 @@ def _sync_profile(profile: Path, record: dict[str, Any], conn: kb_connection.Con
     result: dict[str, Any] = {"profile": profile.name, "from": record.get("version"),
                               "to": record.get("version"), "status": "unchanged"}
     try:
+        if not authz.permits(conn, str(record.get("bot") or profile.name)):
+            raise _NotAllowed
         source = Path(str(record["source"]))
         if not source.is_dir():
             raise FileNotFoundError
         package.assert_downloaded(source / package.MANIFEST)
         pkg = package.read(source)
+        personal.ensure(profile, pkg)  # a bot installed before this feature gets its base now
         if pkg.version not in (record.get("version"), record.get("rolled_back_from")):
-            result["to"] = _update(profile, record, pkg, conn)["version"]
-            result["status"] = "updated"
+            done = _update(profile, record, pkg, conn)
+            result.update(to=done["version"], status="updated", reapplied=done["reapplied"],
+                          pending=done["pending"])
+    except _NotAllowed:
+        result.update(status="not-allowed",
+                      error="Il bot non è più tra quelli autorizzati per questo operatore.")
     except FileNotFoundError:
         result.update(status="source-unavailable", error="La cartella della libreria non è disponibile.")
     except KBError as exc:
         result.update(status="error", error=str(exc))
     return result
+
+
+class _NotAllowed(Exception):
+    """Internal: the operator may not use this bot (see :mod:`authz`)."""
 
 
 def sync(only: Optional[Path] = None) -> list[dict[str, Any]]:
@@ -308,41 +323,14 @@ def _named_allowed(lists: dict[str, Any], name: str) -> bool:
     return lists["wildcard"] or name in lists["allowed"]
 
 
-def _pending_path() -> Path:
-    return data_dir() / "watchdog" / "pending-removal.json"
-
-
-def _removal_is_safe(conn: kb_connection.Connection, lists: dict[str, Any]) -> bool:
-    """Whether "this bot is not in the library" can be trusted: every folder was read, every list parsed.
-
-    An offline drive or a folder not yet downloaded looks exactly like a library that dropped a bot,
-    so any doubt (unreadable root, list or area, files not downloaded, no area list at all) means no removal."""
-    return kb_connection.check(conn).ok and not lists["unreadable"] and bool(lists["areas"])
-
-
-def _remove_not_allowed(profile: Path, bot: str, version: Any, pending: set[str], strikes: set[str]) -> dict[str, Any]:
-    """Two strikes in a row, then Hermes' own ``profile delete`` (chats and memory go with the bot)."""
-    strikes.add(profile.name)
-    if profile.name not in pending:
-        return _outcome(bot, profile.name, "pending-removal", **{"from": version})
-    try:
-        hermes.run(["profile", "delete", profile.name, "--yes"])
-    except KBError as exc:  # e.g. the bot is in use: try again at the next pass
-        return _outcome(bot, profile.name, "pending-removal", **{"from": version}, error=str(exc))
-    strikes.discard(profile.name)
-    return _outcome(bot, profile.name, "removed", **{"from": version})
-
-
 def reconcile() -> list[dict[str, Any]]:
     """Bring this computer in line with the library: install what the areas allow and is missing
-    (deleted by the user, or never installed), update the installed bots, and remove library bots
-    the areas no longer allow.
+    (deleted by the user, or never installed) and update the installed bots.
 
-    Only profiles carrying the library ledger are ever removed (bots the user created or duplicated
-    have none), only when every folder and list was read, and only on the second pass in a row that
-    finds them not allowed. Results are ``{bot, profile, action, from?, to?, error?}`` with ``action``
-    one of ``installed``, ``updated``, ``unchanged``, ``error``, ``source-unavailable``,
-    ``pending-removal``, ``removed``."""
+    Nothing is ever removed: a bot the areas no longer allow is reported as ``not-allowed`` and
+    left where it is (with its chats and memory); the operator decides what to do with it.
+    Results are ``{bot, profile, action, from?, to?, error?}`` with ``action`` one of ``installed``,
+    ``updated``, ``unchanged``, ``not-allowed``, ``error``, ``source-unavailable``."""
     results: list[dict[str, Any]] = []
     conn = kb_connection.load()
     if conn is None:
@@ -365,27 +353,21 @@ def reconcile() -> list[dict[str, Any]]:
                     results.append(_outcome(name, name, "installed", to=done["version"]))
                 except (KBError, OSError) as exc:
                     results.append(_outcome(name, name, "error", error=str(exc)))
-        safe = _removal_is_safe(conn, lists)
-        pending = set(read_json(_pending_path()) or [])
-        strikes: set[str] = set() if safe else set(pending)  # an unsure pass neither adds nor clears strikes
         for source, (profile, record) in installed.items():
             bot = str(record.get("bot") or profile.name)
-            gone = source not in listed and source not in broken and Path(str(record["source"])).is_dir()
-            if gone and safe:
-                results.append(_remove_not_allowed(profile, bot, record.get("version"), pending, strikes))
-                continue
-            if gone:
+            if source not in listed and source not in broken and Path(str(record["source"])).is_dir():
+                results.append(_outcome(bot, profile.name, "not-allowed", **{"from": record.get("version")}))
                 continue
             for done in sync(only=profile):
                 results.append(_outcome(bot, profile.name, done["status"], **{"from": done["from"], "to": done["to"]},
                                         error=done.get("error")))
-        write_json(_pending_path(), sorted(strikes))
     return results
 
 
 def status() -> list[dict[str, Any]]:
     return [{"profile": p.name, "bot": r.get("bot", p.name), "version": r.get("version"), "source": r.get("source"),
-             "rolled_back_from": r.get("rolled_back_from"), "can_rollback": ledger.can_rollback(p)}
+             "rolled_back_from": r.get("rolled_back_from"), "can_rollback": ledger.can_rollback(p),
+             "pending": personal.pending_count(p)}
             for p in named_profiles() if (r := ledger.read(p))]
 
 
@@ -412,41 +394,6 @@ def duplicate(source_profile: str, name: str) -> dict[str, Any]:
         for leftover in (ledger.LEDGER_FILENAME, package.MANIFEST):
             (target / leftover).unlink(missing_ok=True)
         shutil.rmtree(target / ledger.BACKUP_DIRNAME, ignore_errors=True)
+        personal.forget(target)
         profile_config.seed_provider(target)
     return {"profile": new_id}
-
-
-# --- operator proposals ------------------------------------------------------------------------
-
-def _split_blocks(text: str) -> tuple[str, list[tuple[str, str]]]:
-    import re
-
-    heads = list(re.finditer(r"^##\s+\[?([^\s\]]+)\]?", text, re.MULTILINE))
-    if not heads:
-        return text.rstrip(), []
-    blocks = []
-    for i, head in enumerate(heads):
-        end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
-        blocks.append((head.group(1), text[head.start():end].rstrip()))
-    return text[:heads[0].start()].rstrip(), blocks
-
-
-def archive_proposals(pkg: package.Package, conn: kb_connection.Connection) -> None:
-    """Move the operator's proposals a new release incorporated or declined to ``proposte/Archivio``."""
-    resolved = set(pkg.proposals_resolved) | set(pkg.proposals_rejected)
-    from .prompt import proposals_path
-
-    path = proposals_path(conn, pkg.name)
-    if not resolved or not path.is_file():
-        return
-    preamble, blocks = _split_blocks(path.read_text(encoding="utf-8-sig"))
-    moved = [(pid, block) for pid, block in blocks if pid in resolved]
-    if not moved:
-        return
-    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-    entries = [f"> {'Rifiutata' if pid in pkg.proposals_rejected else 'Recepita'} nella versione {pkg.version}\n\n{block}"
-               for pid, block in moved]
-    atomic_write_text(path.parent / ARCHIVE_DIRNAME / f"{pkg.name}-{stamp}-{uuid4().hex[:8]}.md",
-                      f"# Proposte archiviate — {pkg.name} {pkg.version}\n\n" + "\n\n".join(entries) + "\n")
-    kept = ([preamble] if preamble else []) + [block for pid, block in blocks if pid not in resolved]
-    atomic_write_text(path, ("\n\n".join(kept).rstrip() + "\n") if kept else "")

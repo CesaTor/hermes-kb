@@ -114,7 +114,7 @@ def test_status_summarises_the_last_run(wd):
     wd.run(force=False, clock=clock, reconcile=Reconcile())
     status = wd.status(clock)
     assert status["interval_minutes"] == 30 and status["next_due"] == clock.now + 30 * 60
-    assert status["last_run"]["summary"] == {"installed": 1, "updated": 0, "errors": 0, "removed": 0}
+    assert status["last_run"]["summary"] == {"installed": 1, "updated": 0, "errors": 0, "not_allowed": 0}
 
 
 def test_the_thread_ticks_until_stopped_and_a_failing_tick_does_not_kill_it(wd):

@@ -1,0 +1,113 @@
+# Versioni personali, proposte e reparto IT
+
+Data: 18 novembre 2026. Implementato in questa repository, verificato contro Hermes **upstream**
+(`upstream/main`, non il fork ReAgent).
+
+## Le decisioni
+
+| Tema | Scelta |
+|---|---|
+| Prodotto | Hermes-first: il plugin è il prodotto, nessun server; la KB sincronizzata è il canale |
+| SOUL e skill di libreria | Modificabili dall'operatore, live nel profilo, copiati in `proposte/` |
+| `config.yaml` gestito, metadati, cron | Restano rifiutati: la libreria li riallinea |
+| Skill nuove | Nascono in `Operatori/<nome>/skills` via `skills.create_dir` |
+| Conflitto su update | Si chiede in chat; «tengo la mia» = la copia personale resta com'è |
+| Rimozione automatica dei bot | Eliminata: un bot non più abilitato resta, marcato `not-allowed` |
+| Proposte chiuse | Accettata = cancellata dal pacchetto; rifiutata = in `proposte/Archivio/` con motivo |
+| Knowledge | Solo l'autore la legge; cattura automatica a fine turno (non ancora implementata) |
+| Autorizzazioni | `.autorizzazioni.yaml` nascosto nella cartella personale, scritto dall'IT |
+| Due macchine | Ci si affida al sync; copie in conflitto fermano il bot |
+
+## File
+
+Nel profilo (locale, mai sincronizzato):
+
+- `.library-owned.json` — cosa possiede la libreria (già esistente);
+- `.requrv-kb-personal.json` — per SOUL e ogni skill: `base_hash` (certificato all'ultimo sync),
+  `live_hash`, `personal_hash`, `base_version`, `pending`.
+
+Nella cartella personale (condivisa):
+
+```text
+Operatori/<nome>/
+├─ .autorizzazioni.yaml
+├─ skills/                          # create_dir
+└─ proposte/
+   ├─ knowledge/                    # un .md per conoscenza (cattura automatica, fase 2)
+   └─ <bot>/
+      ├─ proposal.yaml              # bot, operatore, base_version, aggiornato_il, hash dei file
+      ├─ SOUL.md                    # copia intera
+      └─ skills/<nome>/             # cartella intera (SKILL.md + scripts/ + asset)
+```
+
+## Flussi
+
+**Scrittura.** `pre_tool_call` lascia passare SOUL e skill; `post_tool_call` (SOUL) e
+`on_skill_lifecycle` (skill) copiano il file in `proposte/<bot>/` e aggiornano gli hash. La modifica
+è già live: il bot la usa dalla conversazione successiva.
+
+**Update.** `personal.plan` legge gli hash prima che Hermes scriva. Poi, per ogni file:
+
+| Stato | Cosa succede |
+|---|---|
+| `clean` | si aggiorna il certificato |
+| `reapply` (personale, certificato invariato) | la copia personale torna sopra, in silenzio |
+| `conflict` (personale, certificato cambiato) | resta live il nuovo; la domanda va in `pending` |
+
+La sezione di prompt `requrv-kb.personal` porta al bot il diff (`-` la tua, `+` la nuova) e le
+istruzioni per chiedere. La risposta passa dal tool `kb_personal` o da `hermes kb resolve`.
+
+**Decisione.** `keep` ricopia la personale sopra la certificata; `take` cancella la copia da
+`proposte/`. In entrambi i casi `base_version` diventa la nuova, quindi la domanda non si ripete
+finché la libreria non cambia di nuovo.
+
+## Autorizzazioni
+
+`.autorizzazioni.yaml` nella cartella personale:
+
+```yaml
+operator: mario
+bots: [marketing, finanza-controllo]   # assente o "*" = tutti i visibili
+ruolo: operatore                       # `it` abilita i tool di revisione
+```
+
+Se manca o è illeggibile non restringe nulla. Il catalogo è l'intersezione fra i `bots.yaml`
+visibili e questo elenco; `install` rifiuta con un messaggio che nomina l'IT.
+
+## Reparto IT
+
+Un operatore con `ruolo: it` riceve i tool `kb_proposals` e `kb_updates` (schema in
+`__init__.py`, implementazione in `requrv_kb/it.py`, skill `revisione-proposte`).
+
+| Azione | Effetto |
+|---|---|
+| `list` | proposte e conoscenze di tutti gli operatori leggibili, con `base_version` |
+| `show` | diff proposta ↔ pacchetto, file per file |
+| `accept` | senza `confirm` restituisce il piano; con `confirm` scrive nei file del pacchetto, alza la patch (`1.4.0 → 1.4.1`) e cancella la proposta |
+| `reject` | sposta in `proposte/Archivio/<bot>-<data>/` con `RIFIUTATA.md` e il motivo |
+| `updates` | cosa la libreria offre e `apply` per installare/aggiornare su questa macchina |
+
+`accept` segnala `stale` quando la proposta parte da una versione diversa da quella attuale del
+pacchetto: l'IT può decidere, ma lo sa.
+
+## Cosa manca
+
+1. **Cattura automatica delle conoscenze** a fine turno (LLM + transcript): il punto più delicato,
+   da fare con un suo spike. L'elenco IT (`proposte/knowledge/`) c'è già.
+2. **Pannello Desktop** per conflitti e revisione (oggi solo CLI e tool).
+3. **Delezione di una skill certificata**: oggi rifiutata; una proposta non sa rappresentarla.
+4. **Dedup delle conoscenze** dopo l'integrazione (la cancellazione è il segnale, ma un fatto può
+   essere riestratto).
+5. **ACL cloud** per far leggere all'IT tutte le cartelle personali: configurazione, non codice.
+
+## Verifica
+
+Tutti i test (45) girano contro Hermes upstream in un worktree separato:
+
+```sh
+cd <checkout upstream> && PYTHONPATH=$PWD python3 -m pytest <plugin>/tests -q
+```
+
+`tests/test_personal.py` copre mirror, riapplicazione silenziosa, conflitto, `keep`/`take`,
+autorizzazioni e `not-allowed`; `tests/test_it.py` copre elenco, diff, accettazione con bump,
+rifiuto con archivio, `updates` e il gating dei tool sul ruolo IT.

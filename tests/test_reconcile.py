@@ -48,63 +48,6 @@ def test_reinstall_survives_the_remains_of_a_half_deleted_profile(connected):
     assert (bot / "SOUL.md").is_file()
 
 
-def disallow(kb):
-    write_yaml(kb["area"] / "bots.yaml", {"bots": ["vendite"]})
-
-
-def test_a_library_bot_no_longer_allowed_is_removed_on_the_second_pass(connected, kb):
-    connected.kb("install", "marketing")
-    disallow(kb)
-    write_yaml(kb["marketing"] / "distribution.yaml", {"name": "marketing", "version": "2.0.0"})
-
-    first = by_bot(connected.kb("reconcile")["results"])["marketing"]
-    assert (first["action"], first["from"]) == ("pending-removal", "1.0.0")
-    assert (connected.profile("marketing") / "SOUL.md").is_file()  # a first strike only marks; no update either
-    assert connected.kb("status")["bots"][0]["version"] == "1.0.0"
-
-    assert by_bot(connected.kb("reconcile")["results"])["marketing"]["action"] == "removed"
-    assert not connected.profile("marketing").exists()
-    assert connected.kb("reconcile")["results"] == []
-
-
-def test_a_bot_allowed_again_between_two_passes_loses_its_strike(connected, kb):
-    connected.kb("install", "marketing")
-    disallow(kb)
-    assert by_bot(connected.kb("reconcile")["results"])["marketing"]["action"] == "pending-removal"
-    write_yaml(kb["area"] / "bots.yaml", {"bots": ["marketing"]})
-    assert by_bot(connected.kb("reconcile")["results"])["marketing"]["action"] == "unchanged"
-    disallow(kb)
-    assert by_bot(connected.kb("reconcile")["results"])["marketing"]["action"] == "pending-removal"
-    assert connected.profile("marketing").exists()
-
-
-def test_duplicates_and_user_created_bots_are_never_removed(connected, kb):
-    connected.kb("install", "marketing")
-    connected.kb("duplicate", "marketing", "Marketing mio")
-    connected.hermes("profile", "create", "mio-bot", "--no-alias")
-    disallow(kb)
-    for expected in ({"marketing"}, {"marketing"}, set()):  # strike, removal, nothing left to report
-        assert {r["bot"] for r in connected.kb("reconcile")["results"]} == expected
-    assert not connected.profile("marketing").exists()
-    assert connected.profile("marketing-mio").is_dir() and connected.profile("mio-bot").is_dir()
-    assert not (connected.profile("marketing-mio") / ".library-owned.json").exists()
-
-
-def test_nothing_is_removed_when_a_folder_or_list_cannot_be_read(connected, kb):
-    connected.kb("install", "marketing")
-    disallow(kb)
-    assert by_bot(connected.kb("reconcile")["results"])["marketing"]["action"] == "pending-removal"
-    (kb["area"] / "bots.yaml").write_text("bots: [non chiuso\n")  # unreadable list (as after a damaged sync)
-    assert connected.kb("reconcile")["results"] == []
-    kb["area"].rename(kb["area"].with_name("01-Spostata"))  # area gone from the connected roots
-    assert connected.kb("reconcile")["results"] == []
-    assert connected.profile("marketing").is_dir()
-    # the strike survived the unsure passes, and a later sure pass completes it
-    kb["area"].with_name("01-Spostata").rename(kb["area"])
-    disallow(kb)
-    assert by_bot(connected.kb("reconcile")["results"])["marketing"]["action"] == "removed"
-
-
 def test_a_bot_that_was_never_allowed_is_not_installed(connected, kb):
     assert "finanza" not in by_bot(connected.kb("reconcile")["results"])
     assert not connected.profile("finanza").exists()

@@ -5,7 +5,13 @@ author: ReQurv
 license: LicenseRef-ReQurv-Proprietary
 manifest_version: 2
 kind: standalone
-provides_tools: []
+provides_tools:
+  - kb_personal
+  - kb_proposals
+  - kb_updates
+  - kb_capture_knowledge
 provides_hooks:
   - pre_tool_call
+  - post_tool_call
+  - on_skill_lifecycle
   - on_session_start

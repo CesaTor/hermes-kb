@@ -61,19 +61,25 @@ def _unlock(handle) -> None:
 
 
 @contextlib.contextmanager
-def lease() -> Iterator[bool]:
-    """Yield True while this process holds the machine-wide lock, False when another one does."""
-    path = state_dir() / _LOCK_FILE
+def lease(path: Path | None = None, *, timeout: float = 0) -> Iterator[bool]:
+    """Yield whether the local lock could be acquired within the supplied timeout."""
+    path = path if path is not None else state_dir() / _LOCK_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a+b") as handle:
-        if path.stat().st_size == 0:
+        if os.fstat(handle.fileno()).st_size == 0:
             handle.write(b"\0")  # msvcrt locks a byte range, so there must be a byte to lock
             handle.flush()
-        try:
-            _lock(handle)
-        except OSError:
-            yield False
-            return
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                _lock(handle)
+                break
+            except OSError:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    yield False
+                    return
+                time.sleep(min(remaining, 0.05))
         try:
             yield True
         finally:
@@ -89,7 +95,7 @@ def summarize(results: list[dict[str, Any]]) -> dict[str, int]:
     actions = [r.get("action") for r in results]
     return {"installed": actions.count("installed"), "updated": actions.count("updated"),
             "errors": actions.count("error") + actions.count("source-unavailable"),
-            "removed": actions.count("removed")}
+            "not_allowed": actions.count("not-allowed")}
 
 
 def _interval_s() -> Optional[float]:

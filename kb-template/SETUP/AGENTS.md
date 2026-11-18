@@ -25,7 +25,8 @@ Il plugin è pubblico su GitHub: `CesaTor/hermes-kb`.
 - **Se l'utente usa Hermes Desktop** (preferito): apri il link di installazione, che installa e accende
   sia la parte agente sia la parte dell'app.
   - macOS: `open "hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1"`
-  - Windows: `start "" "hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1"`
+  - Windows (PowerShell): `Start-Process 'hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1'`
+  - Windows (`cmd.exe`): `start "" "hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1"`
 
   Chiedi all'utente di confermare nel dialogo di Hermes e di dirtelo quando ha finito.
 - **Solo terminale:** `hermes plugins install CesaTor/hermes-kb --enable`. Questo accende solo la parte
@@ -72,8 +73,17 @@ hermes kb reconcile
 ```
 
 Installa tutti i bot che le aree dell'utente abilitano. Mostra all'utente l'elenco risultante
-(`hermes kb status`). Da qui in poi il plugin controlla da solo ogni 30 minuti: aggiorna i bot,
-reinstalla quelli cancellati e rimuove quelli aziendali non più abilitati.
+(`hermes kb status`). Da qui in poi il plugin controlla da solo ogni 30 minuti: aggiorna i bot e
+reinstalla quelli cancellati; **non rimuove mai** un bot (uno non più abilitato resta, e viene
+segnalato come `not-allowed`).
+
+Se nella cartella personale c'è un `.autorizzazioni.yaml`, quello restringe i bot installabili:
+se manca valgono i `bots.yaml` delle aree. Non crearlo: lo fornisce l'IT.
+
+**Reparto IT.** Prima del setup, l'IT pubblica il pacchetto `knowledge-manager` dal template nella
+libreria, aggiunge il nome al `bots.yaml` dell'area IT e assegna `ruolo: it` nel proprio
+`.autorizzazioni.yaml`. Se stai configurando la macchina dell'IT, verifica che `hermes kb status`
+mostri anche il Knowledge Manager. Quel bot mantiene `Wiki/` e rivede le proposte degli operatori.
 
 ## 6. Imposta l'app (solo Hermes Desktop)
 

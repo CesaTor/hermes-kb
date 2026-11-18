@@ -173,8 +173,7 @@ const ACTION = {
   updated: { label: 'aggiornato', variant: 'success' },
   error: { label: 'errore', variant: 'destructive' },
   'source-unavailable': { label: 'sorgente non disponibile', variant: 'destructive' },
-  'pending-removal': { label: 'non più abilitato, sarà rimosso', variant: 'default' },
-  removed: { label: 'rimosso (non più abilitato)', variant: 'default' }
+  'not-allowed': { label: 'non più abilitato, resta sul computer', variant: 'default' }
 }
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
@@ -190,12 +189,14 @@ function summarize(res) {
   if (!run) return null
   const s = run.summary
   if (run.error) return host.notify({ kind: 'error', message: run.error })
-  if (s.installed || s.updated || s.removed) {
+  if (s.installed || s.updated) {
     const parts = []
     if (s.installed) parts.push(`${plural(s.installed, 'bot installato', 'bot installati')}`)
     if (s.updated) parts.push(`${plural(s.updated, 'bot aggiornato', 'bot aggiornati')}`)
-    if (s.removed) parts.push(`${plural(s.removed, 'bot rimosso', 'bot rimossi')}`)
     ok(`${parts.join(' e ')} dalla libreria.`)
+  }
+  if (s.not_allowed) {
+    info(`${plural(s.not_allowed, 'bot non più abilitato resta', 'bot non più abilitati restano')} sul computer.`)
   }
   for (const r of run.results.filter(r => r.action === 'error' || r.action === 'source-unavailable')) {
     host.notify({ kind: 'error', message: `${r.bot}: ${r.error || ACTION[r.action].label}` })
@@ -251,7 +252,8 @@ function WatchdogSection({ api, status, onChanged }) {
     hs('div', { className: 'flex flex-col gap-3' }, [
       h(Note, {}, 'Mentre Hermes è aperto, la libreria viene controllata a intervalli: i bot con una nuova versione si '
         + 'aggiornano, quelli abilitati ma mancanti (eliminati o mai installati) tornano senza le loro chat, e i bot '
-        + 'aziendali non più abilitati vengono rimossi con chat e memoria. I bot che hai creato o duplicato restano.'),
+        + 'aziendali non più abilitati restano sul computer, segnalati come tali: decidi tu se eliminarli. '
+        + 'I bot che hai creato o duplicato restano.'),
       hs('div', { className: 'flex flex-wrap items-center gap-2' }, [
         h('span', { className: 'text-xs text-(--ui-text-secondary)' }, 'Controlla ogni'),
         h(Input, {
@@ -266,7 +268,9 @@ function WatchdogSection({ api, status, onChanged }) {
       run
         ? hs('div', { className: 'flex flex-col gap-2' }, [
             h(Note, {}, `Ultimo controllo: ${whenText(run.at)} · ${plural(s.installed, 'installato', 'installati')}, `
-              + `${plural(s.updated, 'aggiornato', 'aggiornati')}, ${plural(s.removed, 'rimosso', 'rimossi')}, ${plural(s.errors, 'errore', 'errori')}`),
+              + `${plural(s.updated, 'aggiornato', 'aggiornati')}, `
+              + `${plural(s.not_allowed, 'non più abilitato', 'non più abilitati')}, `
+              + `${plural(s.errors, 'errore', 'errori')}`),
             run.error ? h(Note, { tone: 'error' }, run.error) : h(ResultRows, { run })
           ])
         : h(Note, {}, 'Nessun controllo eseguito finora.'),
