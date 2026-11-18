@@ -175,3 +175,20 @@ def test_a_bot_no_longer_allowed_stays_with_its_chats(connected, kb):
         result = {r["bot"]: r for r in connected.kb("reconcile")["results"]}["marketing"]
         assert result["action"] == "not-allowed"
         assert bot.is_dir() and (bot / "memories" / "MEMORY.md").read_text() == "ricordo"
+
+
+def test_pre_llm_call_injects_the_question_once_per_session(connected, kb):
+    connected.kb("install", "marketing")
+    bot = connected.profile("marketing")
+    (bot / "SOUL.md").write_text(MIO_SOUL, encoding="utf-8")
+    code = """
+import json
+from requrv_kb import prompt
+print(json.dumps(prompt.pre_llm_call(session_id="s1"), ensure_ascii=False))
+print(json.dumps(prompt.pre_llm_call(session_id="s1"), ensure_ascii=False))
+print(json.dumps(prompt.pre_llm_call(session_id="s2"), ensure_ascii=False))
+"""
+    lines = connected.python(code, bot).splitlines()
+    assert "Vuoi tenere la tua versione o prendere la nuova?" in lines[0]
+    assert json.loads(lines[1]) is None
+    assert "Vuoi tenere la tua versione o prendere la nuova?" in lines[2]

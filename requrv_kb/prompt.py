@@ -3,9 +3,9 @@
 A library bot's ``SOUL.md`` and shipped skills belong to the library, but the operator may change
 them: the change is live in their profile and :mod:`mirror` copies it in
 ``Operatori/<nome>/proposte/<bot>/`` for the IT. When the library publishes a new release that
-touches one of those files, both changed: the certified version stays live and this section tells
-the bot to explain the difference and ask, once, whether to keep the personal version or take the
-new one. The answer goes through the ``kb_personal`` tool.
+touches one of those files, both changed: the personal version stays live, the certified version
+is staged and this section tells the bot to ask, once, whether to keep the personal version or take
+the new one. The answer goes through the ``kb_personal`` tool.
 
 Both sections are frozen into each new session's system prompt (Hermes' plugin prompt sections),
 so an edit applies to the next conversation and never rewrites a cached prompt mid-session.
@@ -18,16 +18,19 @@ is in scope: one new, general, reusable fact or process per ordinary turn, throu
 from __future__ import annotations
 
 import difflib
+import threading
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from . import authz, ledger, mirror, personal
+from . import authz, ledger, mirror, package, personal
 from . import connection as kb_connection
 from .paths import KBError
 
 # Hermes caps one plugin prompt section at 4,000 characters; keep room for the header.
 _PROMPT_BUDGET = 3_600
 _DIFF_BUDGET = 1_100
+_INJECTED: set[str] = set()
+_INJECTED_LOCK = threading.Lock()
 
 _CAPTURE_LINES = (
     "",
@@ -122,16 +125,8 @@ def _diff(personal_file: Path, live_file: Path) -> str:
     return text
 
 
-def personal_section(_session: Mapping[str, Any] | None = None) -> str:
-    """The operator versions a new release collided with, with a diff the bot can explain."""
-    from hermes_constants import get_hermes_home
-
-    conn = kb_connection.load()
-    if conn is None:
-        return ""
-    profile = Path(get_hermes_home())
-    from . import ledger, package
-
+def _pending_items(profile: Path, conn: Any) -> list[dict[str, Any]]:
+    """Ensure the divergence is recorded, then return the pending choices."""
     source = (ledger.read(profile) or {}).get("source")
     if isinstance(source, str) and source:
         try:
@@ -141,9 +136,47 @@ def personal_section(_session: Mapping[str, Any] | None = None) -> str:
         if pkg is not None:
             personal.ensure_pending(profile, pkg, conn)
     record = personal.read(profile)
-    pending = [p for p in record.get("pending", []) if isinstance(p, dict)]
+    return [p for p in record.get("pending", []) if isinstance(p, dict)]
+
+
+def pre_llm_call(session_id: str = "", **_: Any) -> Optional[dict[str, str]]:
+    """Inject the keep/take question once per session, even if the model ignores the prompt section."""
+    from hermes_constants import get_hermes_home
+
+    conn = kb_connection.load()
+    if conn is None:
+        return None
+    profile = Path(get_hermes_home())
+    if not personal.pending(profile):
+        _pending_items(profile, conn)
+    if not personal.pending(profile):
+        return None
+    key = str(session_id or "default")
+    with _INJECTED_LOCK:
+        if key in _INJECTED:
+            return None
+        _INJECTED.add(key)
+    return {"context": (
+        "AZIONE OBBLIGATORIA (ReQurv KB): c'è una versione personale del SOUL o di una skill da "
+        "decidere. Prima di rispondere all'utente, chiedi esplicitamente: «Ho una versione "
+        "personale diversa da quella della libreria. Vuoi tenere la tua versione o prendere la "
+        "nuova?». Non parlare dei numeri di versione e non modificare il file. Se risponde «tengo "
+        "la mia» usa kb_personal con choice keep; se risponde «prendo la nuova» usa choice take."
+    )}
+
+
+def personal_section(_session: Mapping[str, Any] | None = None) -> str:
+    """The operator versions a new release collided with, with a diff the bot can explain."""
+    from hermes_constants import get_hermes_home
+
+    conn = kb_connection.load()
+    if conn is None:
+        return ""
+    profile = Path(get_hermes_home())
+    pending = _pending_items(profile, conn)
     if not pending:
         return ""
+    record = personal.read(profile)
     bot = str(record.get("bot") or profile.name)
     folder = mirror.bot_dir(conn, bot)
     lines = [

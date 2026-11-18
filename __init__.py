@@ -191,6 +191,7 @@ def register(ctx):
     ctx.register_hook("post_tool_call", mirror.on_tool_call)
     ctx.register_hook("on_skill_lifecycle", mirror.on_skill_lifecycle)
     ctx.register_hook("on_session_start", autosync.on_session_start)
+    ctx.register_hook("pre_llm_call", prompt.pre_llm_call)
     ctx.register_tool(name="kb_personal", toolset="kb", schema=_KB_PERSONAL_SCHEMA,
                       handler=_kb_personal, emoji="🔁",
                       description=("Versioni personali del bot di libreria: elenca quelle in attesa di una "

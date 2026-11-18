@@ -15,3 +15,4 @@ provides_hooks:
   - post_tool_call
   - on_skill_lifecycle
   - on_session_start
+  - pre_llm_call
