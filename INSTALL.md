@@ -217,8 +217,10 @@ Le modifiche non sono su GitHub. Fai commit e push, oppure prova il working tree
 descritta sopra.
 
 **`hermes plugins install` chiede conferma o segnala uno scanner.**
-È il controllo di sicurezza di Hermes. Leggi l'esito: se il repository è quello giusto, conferma.
-Non usare `--force` per aggirare un errore che non hai capito.
+È il controllo di sicurezza di Hermes. Il dialogo «Unverified» è normale per un plugin comunitario:
+leggi la fonte e conferma. Se il verdetto è «dangerous», **fermati**: non usare `--force` per
+aggirarlo. Un verdetto «caution», se hai verificato il repository, si può confermare leggendo
+l'avviso. Il repository di questo plugin deve risultare «safe»: se non lo è, non installare.
 
 **Non c'è un modello configurato.**
 Il plugin non configura il provider. Installa o configura ReQurv Bridge (o un altro provider) nel

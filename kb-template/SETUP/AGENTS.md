@@ -29,9 +29,14 @@ Il plugin è pubblico su GitHub: `CesaTor/hermes-kb`.
   - Windows (`cmd.exe`): `start "" "hermes://plugin/install?repo=CesaTor/hermes-kb&enable=1"`
 
   Chiedi all'utente di confermare nel dialogo di Hermes e di dirtelo quando ha finito.
+  Il dialogo «Unverified» è normale per un plugin comunitario: l'utente deve leggere la fonte e
+  confermare. Se il verdetto di sicurezza è «dangerous», non forzare l'installazione: fermati e
+  mostra il messaggio.
 - **Solo terminale:** `hermes plugins install CesaTor/hermes-kb --enable`. Questo accende solo la parte
   agente: avvisa l'utente che, se usa Hermes Desktop, deve accendere anche ReQurv KB in Capabilities →
   Plugins e riavviare l'app (pagina Impostazioni, controllo all'avvio e layout dipendono da quella parte).
+  Anche qui, se lo scanner chiede conferma, leggere l'esito: non usare `--force` per aggirare un
+  verdetto «dangerous».
 
 Controlla con `hermes plugins list` che `requrv-kb` risulti attivo.
 
