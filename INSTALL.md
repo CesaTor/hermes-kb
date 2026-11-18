@@ -88,15 +88,10 @@ per la pagina Impostazioni, il tema ReQurv, il layout `requrv-kb:minimal` e il c
 
 Questo è il percorso che permette a Hermes di fare quasi tutto da solo, come con il vecchio plugin.
 
-1. Copia il file `kb-template/SETUP/AGENTS.md` del repository nella cartella `SETUP/` della KB:
-
-   ```sh
-   cp kb-template/SETUP/AGENTS.md "/percorso/della/KB/SETUP/AGENTS.md"
-   ```
-
-   La cartella `SETUP` deve stare accanto a `Biblioteca-Agenti`, alle aree e a `Operatori`. Se la KB
-   ha già una copia vecchia di `AGENTS.md`, sostituiscila con quella del repository: le istruzioni
-   cambiano con il plugin.
+1. Apri la cartella `kb-template/SETUP/` del repository e copia il file `AGENTS.md` nella cartella
+   `SETUP/` della KB usando Finder (macOS) o Esplora file (Windows). La cartella `SETUP` deve stare
+   accanto a `Biblioteca-Agenti`, alle aree e a `Operatori`. Se la KB ha già una copia vecchia di
+   `AGENTS.md`, sostituiscila con quella del repository: le istruzioni cambiano con il plugin.
 
 2. Apri una nuova conversazione con Hermes e scrivi:
 
