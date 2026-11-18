@@ -147,14 +147,18 @@ def personal_section(_session: Mapping[str, Any] | None = None) -> str:
     bot = str(record.get("bot") or profile.name)
     folder = mirror.bot_dir(conn, bot)
     lines = [
-        "## Versioni personali da decidere (ReQurv KB)",
-        f"Il bot di libreria «{bot}» ha una versione certificata diversa dalla tua. La tua "
-        "versione personale è rimasta live; la versione certificata è conservata ma non è stata applicata.",
-        "Al primo uso di ognuna di queste, spiega in massimo 5 righe la differenza e chiedi se tenere la sua "
-        "versione o prendere la nuova. Nelle righe qui sotto «-» è la sua versione e «+» è quella nuova.",
-        "Registra la risposta con lo strumento kb_personal: "
-        "{\"action\": \"decide\", \"kind\": \"soul\"|\"skill\", \"name\": \"...\", \"choice\": \"keep\"|\"take\"}. "
+        "## AZIONE OBBLIGATORIA — Versione personale da decidere (ReQurv KB)",
+        f"Il bot «{bot}» ha una versione personale di un file diversa da quella certificata. La versione "
+        "personale è già live; quella certificata è conservata e NON è stata applicata.",
+        "Alla prima risposta di questa sessione, prima di qualsiasi altra cosa, chiedi all'operatore, "
+        "con una domanda esplicita: «Ho una versione personale diversa da quella della libreria. Vuoi "
+        "tenere la tua versione o prendere la nuova?». Poi fermati e aspetta la risposta.",
+        "Non limitarti a segnalare un conflitto e non parlare dei numeri di versione: la scelta riguarda "
+        "il contenuto del file. Non modificare il file: la versione personale è già live.",
+        "Se risponde «tengo la mia», chiama kb_personal con choice «keep»; se risponde «prendo la nuova», "
+        "chiama kb_personal con choice «take». Usa action «decide», il kind e il name indicati qui sotto. "
         "Se non risponde, non insistere: la versione personale resta live.",
+        "Nelle righe qui sotto «-» è la sua versione e «+» è quella nuova.",
     ]
     for item in pending:
         kind = str(item.get("kind") or "")
@@ -162,13 +166,14 @@ def personal_section(_session: Mapping[str, Any] | None = None) -> str:
         incoming = personal.incoming_path(profile, item)
         if kind == "soul":
             diff = _diff(folder / "SOUL.md", incoming or (profile / "SOUL.md"))
-            lines += ["### SOUL.md", diff or "(differenza non leggibile)"]
+            lines += ["### SOUL.md (kind: soul, name: \"\")", diff or "(differenza non leggibile)"]
         elif kind == "skill":
             found = personal.skill_dir(profile / "skills", name)
             incoming_skill = incoming / "SKILL.md" if incoming is not None else None
             diff = _diff(folder / "skills" / name / "SKILL.md",
                          incoming_skill or ((found / "SKILL.md") if found else Path("/non-esiste")))
-            lines += [f"### Skill «{name}»", diff or "(differenza non leggibile)"]
+            lines += [f"### Skill «{name}» (kind: skill, name: \"{name}\")",
+                      diff or "(differenza non leggibile)"]
     text = "\n".join(lines)
     if len(text) > _PROMPT_BUDGET:
         text = text[:_PROMPT_BUDGET].rstrip() + "\n[...]"

@@ -104,7 +104,7 @@ def test_a_manual_edit_is_surfaced_at_the_next_prompt_without_an_update(connecte
 
     prompt = connected.python("from requrv_kb.prompt import personal_section; print(personal_section({}))",
                               bot)
-    assert "Versioni personali" in prompt and "Dai sempre del lei." in prompt
+    assert "AZIONE OBBLIGATORIA" in prompt and "Dai sempre del lei." in prompt
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
     assert connected.kb("status")["bots"][0]["pending"] == 1
 
@@ -128,7 +128,7 @@ def test_a_library_change_asks_and_keep_restores_the_personal_version(connected,
 
     prompt = connected.python("from requrv_kb.prompt import personal_section; print(personal_section({}))",
                               bot)
-    assert "Versioni personali" in prompt and "kb_personal" in prompt
+    assert "AZIONE OBBLIGATORIA" in prompt and "kb_personal" in prompt
     assert "Dai sempre del lei." in prompt and "Brand nostro" in prompt
 
     assert _kb_as(connected, "marketing", "resolve", "--kind", "soul", "--choice", "keep")["choice"] == "keep"
