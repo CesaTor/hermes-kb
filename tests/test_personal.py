@@ -97,6 +97,22 @@ def test_a_personal_soul_from_before_the_feature_is_adopted_on_the_first_update(
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
 
 
+def test_a_manual_edit_is_surfaced_at_the_next_prompt_without_an_update(connected, kb):
+    connected.kb("install", "marketing")
+    bot = connected.profile("marketing")
+    (bot / "SOUL.md").write_text(MIO_SOUL, encoding="utf-8")  # editor, no update, no write hook
+
+    prompt = connected.python("from requrv_kb.prompt import personal_section; print(personal_section({}))",
+                              bot)
+    assert "Versioni personali" in prompt and "Dai sempre del lei." in prompt
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL
+    assert connected.kb("status")["bots"][0]["pending"] == 1
+
+    assert _kb_as(connected, "marketing", "resolve", "--kind", "soul", "--choice", "keep")["choice"] == "keep"
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL
+    assert connected.kb("status")["bots"][0]["pending"] == 0
+
+
 def test_a_library_change_asks_and_keep_restores_the_personal_version(connected, kb):
     connected.kb("install", "marketing")
     bot = connected.profile("marketing")

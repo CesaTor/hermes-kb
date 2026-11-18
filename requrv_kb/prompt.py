@@ -23,6 +23,7 @@ from typing import Any, Mapping, Optional
 
 from . import authz, ledger, mirror, personal
 from . import connection as kb_connection
+from .paths import KBError
 
 # Hermes caps one plugin prompt section at 4,000 characters; keep room for the header.
 _PROMPT_BUDGET = 3_600
@@ -129,6 +130,16 @@ def personal_section(_session: Mapping[str, Any] | None = None) -> str:
     if conn is None:
         return ""
     profile = Path(get_hermes_home())
+    from . import ledger, package
+
+    source = (ledger.read(profile) or {}).get("source")
+    if isinstance(source, str) and source:
+        try:
+            pkg = package.read(Path(source))
+        except KBError:
+            pkg = None
+        if pkg is not None:
+            personal.ensure_pending(profile, pkg, conn)
     record = personal.read(profile)
     pending = [p for p in record.get("pending", []) if isinstance(p, dict)]
     if not pending:
@@ -137,8 +148,8 @@ def personal_section(_session: Mapping[str, Any] | None = None) -> str:
     folder = mirror.bot_dir(conn, bot)
     lines = [
         "## Versioni personali da decidere (ReQurv KB)",
-        f"Il bot di libreria «{bot}» ha una nuova versione ({record.get('base_version')}). La tua "
-        "versione personale è rimasta live; la nuova versione è conservata ma non è stata applicata.",
+        f"Il bot di libreria «{bot}» ha una versione certificata diversa dalla tua. La tua "
+        "versione personale è rimasta live; la versione certificata è conservata ma non è stata applicata.",
         "Al primo uso di ognuna di queste, spiega in massimo 5 righe la differenza e chiedi se tenere la sua "
         "versione o prendere la nuova. Nelle righe qui sotto «-» è la sua versione e «+» è quella nuova.",
         "Registra la risposta con lo strumento kb_personal: "

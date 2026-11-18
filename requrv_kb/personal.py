@@ -312,6 +312,51 @@ def _clear_incoming(profile: Path, item: dict[str, Any]) -> None:
         source.unlink(missing_ok=True)
 
 
+def ensure_pending(profile: Path, pkg: package.Package, conn: Any) -> list[dict[str, Any]]:
+    """Surface a personal/certified divergence that no update has recorded yet.
+
+    A SOUL edited with an editor, or a profile restored from a backup, can diverge while the package
+    version is unchanged. At prompt time we stage the certified file and add the pending question,
+    so the operator always gets the keep/take choice before the next change. A decision already made
+    for the current certified base is not asked again.
+    """
+    record = ensure(profile, pkg)
+    if _refresh_live(profile, record):
+        write(profile, record)
+    from . import mirror
+
+    mirror.adopt_existing(profile, conn, str(record.get("bot") or pkg.name))
+    pending_items = [p for p in record.get("pending", []) if isinstance(p, dict)]
+    changed = False
+    for kind, name in [("soul", ""), *[("skill", str(n)) for n in (record.get("skills") or {})]]:
+        entry = _find(record, kind, name)
+        if not entry or not entry.get("personal_hash"):
+            continue
+        key = _key(kind, name)
+        if entry.get("decided_base") == entry.get("base_hash"):
+            continue
+        item = next((p for p in pending_items if _key(str(p.get("kind")), str(p.get("name") or "")) == key), None)
+        if item is None:
+            staged = _stage_incoming(profile, pkg, kind, name)
+            item = {"kind": kind, "name": name, "from_version": record.get("base_version") or "",
+                    "to_version": pkg.version,
+                    "since": datetime.now(UTC).isoformat(timespec="seconds")}
+            if staged:
+                item["incoming"] = staged
+            pending_items.append(item)
+            changed = True
+        elif not incoming_path(profile, item):
+            staged = _stage_incoming(profile, pkg, kind, name)
+            if staged:
+                item["incoming"] = staged
+                changed = True
+    if changed:
+        record["pending"] = pending_items
+        record["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+        write(profile, record)
+    return pending(profile)
+
+
 def apply_after_update(profile: Path, pkg: package.Package, planned: dict[str, Any],
                        conn: Any) -> dict[str, Any]:
     """Re-apply or hold back the personal copies, now that Hermes wrote the new version."""
@@ -351,12 +396,17 @@ def apply_after_update(profile: Path, pkg: package.Package, planned: dict[str, A
             }
             if restored:
                 entry["live_hash"] = entry.get("personal_hash")
+            entry.pop("decided_base", None)
         else:
             entry["personal_hash"] = None
+            entry["decided_base"] = new_hash
         entry["base_hash"] = new_hash
         entry["live_hash"] = _live(profile, kind, name) or new_hash
         if state == "clean":
             entry["personal_hash"] = None
+            entry.pop("decided_base", None)
+        elif state == "reapply":
+            entry["decided_base"] = new_hash
 
     settle("soul", "", planned.get("soul") or "clean")
     for name, state in (planned.get("skills") or {}).items():
@@ -401,6 +451,7 @@ def decide(profile: Path, conn: Any, kind: str, name: str, choice: str) -> dict[
         entry["personal_hash"] = None
         entry["live_hash"] = _live(profile, kind, name) or entry.get("live_hash")
         _clear_incoming(profile, item)
+    entry["decided_base"] = entry.get("base_hash")
     record["pending"] = [p for p in record.get("pending", []) if p is not item]
     record["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     write(profile, record)

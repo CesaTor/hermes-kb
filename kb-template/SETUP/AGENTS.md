@@ -90,7 +90,8 @@ conversazione con un bot: aggiorna i bot e reinstalla quelli cancellati; **non r
 
 Se l'operatore ha personalizzato il SOUL o una skill e la libreria pubblica una versione che tocca
 quel file, la versione personale resta live; il bot al primo uso spiega la differenza e chiede se
-tenere la versione dell'operatore o prendere la nuova. La risposta si registra con il tool
+tenere la versione dell'operatore o prendere la nuova. Lo chiede anche se la divergenza esiste già
+senza un update (per esempio un SOUL modificato con un editor). La risposta si registra con il tool
 `kb_personal` oppure con `hermes -p <bot> kb resolve --kind soul|skill --choice keep|take`;
 «tengo la mia» lascia la copia personale, «prendo la nuova» applica la versione conservata e la
 rimuove dalle proposte.
