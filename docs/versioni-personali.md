@@ -24,7 +24,9 @@ Nel profilo (locale, mai sincronizzato):
 
 - `.library-owned.json` — cosa possiede la libreria (già esistente);
 - `.requrv-kb-personal.json` — per SOUL e ogni skill: `base_hash` (certificato all'ultimo sync),
-  `live_hash`, `personal_hash`, `base_version`, `pending`.
+  `live_hash`, `personal_hash`, `base_version`, `pending`;
+- `.requrv-kb-incoming/<versione>/` — la nuova versione certificata messa da parte durante un
+  conflitto, pronta per «prendo la nuova».
 
 Nella cartella personale (condivisa):
 
