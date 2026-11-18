@@ -104,7 +104,8 @@ def test_a_manual_edit_is_surfaced_at_the_next_prompt_without_an_update(connecte
 
     prompt = connected.python("from requrv_kb.prompt import personal_section; print(personal_section({}))",
                               bot)
-    assert "AZIONE OBBLIGATORIA" in prompt and "Dai sempre del lei." in prompt
+    assert "AZIONE OBBLIGATORIA" in prompt and "Vuoi tenere la tua versione o prendere la nuova?" in prompt
+    assert "Dai sempre del lei." in prompt
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
     assert connected.kb("status")["bots"][0]["pending"] == 1
 
