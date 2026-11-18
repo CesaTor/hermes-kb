@@ -54,14 +54,14 @@ ogni file:
 |---|---|
 | `clean` | si aggiorna il certificato |
 | `reapply` (personale, certificato invariato) | la copia personale torna sopra, in silenzio |
-| `conflict` (personale, certificato cambiato) | resta live il nuovo; la domanda va in `pending` |
+| `conflict` (personale, certificato cambiato) | resta live la personale; la nuova è conservata in locale e la domanda va in `pending` |
 
 La sezione di prompt `requrv-kb.personal` porta al bot il diff (`-` la tua, `+` la nuova) e le
 istruzioni per chiedere. La risposta passa dal tool `kb_personal` o da `hermes kb resolve`.
 
-**Decisione.** `keep` ricopia la personale sopra la certificata; `take` cancella la copia da
-`proposte/`. In entrambi i casi `base_version` diventa la nuova, quindi la domanda non si ripete
-finché la libreria non cambia di nuovo.
+**Decisione.** `keep` mantiene la personale live; `take` applica la nuova versione conservata e
+cancella la copia da `proposte/`. In entrambi i casi `base_version` diventa la nuova, quindi la
+domanda non si ripete finché la libreria non cambia di nuovo.
 
 ## Autorizzazioni
 

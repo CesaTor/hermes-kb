@@ -417,8 +417,8 @@ noto. Il test vale solo per i tool dell'agente.
 
 1. Porta la libreria a una versione ancora successiva (es. `3.0.0`) cambiando anche `SOUL.md`.
 2. `HERMES_HOME="$H_OP" hermes kb update marketing`.
-3. `HERMES_HOME="$H_OP" hermes kb status` → `(1 versioni tue da decidere)`; il SOUL live è quello
-   nuovo della libreria.
+3. `HERMES_HOME="$H_OP" hermes kb status` → `(1 versioni tue da decidere)`; il SOUL live resta
+   quello personale, la nuova versione è conservata per la scelta.
 4. Apri una nuova chat: il bot deve spiegare la differenza e chiedere.
 5. Rispondi “tieni la mia” oppure esegui:
 

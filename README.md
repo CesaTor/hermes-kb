@@ -86,9 +86,10 @@ rifiutati, perché la libreria li riallinea.
 Quando la libreria pubblica una versione che tocca un file modificato:
 
 - se il file certificato **non è cambiato**, la copia personale viene riapplicata in silenzio;
-- se è **cambiato**, resta live la versione nuova e il bot, al primo uso, spiega le differenze e chiede
-  se tenere la propria o prendere la nuova. La risposta si registra con il tool `kb_personal` (o
-  `hermes kb resolve`) e vale per quella skill/quel SOUL fino alla release successiva.
+- se è **cambiato**, resta live la versione personale; quella nuova viene conservata e il bot, al
+  primo uso, spiega le differenze e chiede se tenere la propria o prendere la nuova. La risposta si
+  registra con il tool `kb_personal` (o `hermes kb resolve`) e vale per quella skill/quel SOUL fino
+  alla release successiva.
 
 Il **reparto IT** ha un proprio operatore con `ruolo: it` in `.autorizzazioni.yaml`: i tool
 `kb_proposals` e `kb_updates` (e i comandi `hermes kb it …`) gli mostrano le proposte di tutti gli

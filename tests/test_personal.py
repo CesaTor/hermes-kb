@@ -77,7 +77,7 @@ def test_a_manual_soul_edit_is_detected_on_the_next_update(connected, kb):
 
     result = connected.kb("update", "marketing")
     assert result["pending"] == [{"kind": "soul", "name": ""}]
-    assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL  # the personal version never leaves the profile
     assert (kb["personal"] / "proposte" / "marketing" / "SOUL.md").read_text() == MIO_SOUL
     assert _kb_as(connected, "marketing", "resolve", "--kind", "soul", "--choice", "keep")["choice"] == "keep"
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
@@ -92,7 +92,7 @@ def test_a_personal_soul_from_before_the_feature_is_adopted_on_the_first_update(
 
     result = connected.kb("update", "marketing")
     assert result["pending"] == [{"kind": "soul", "name": ""}]
-    assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL
     assert _kb_as(connected, "marketing", "resolve", "--kind", "soul", "--choice", "keep")["choice"] == "keep"
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
 
@@ -106,7 +106,8 @@ def test_a_library_change_asks_and_keep_restores_the_personal_version(connected,
 
     result = connected.kb("update", "marketing")
     assert sorted((p["kind"], p["name"]) for p in result["pending"]) == [("skill", "brand"), ("soul", "")]
-    assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"  # the certified version stays live
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL  # personal version stays live
+    assert (bot / "skills" / "brand" / "SKILL.md").read_text() == MIO_BRAND
     assert connected.kb("status")["bots"][0]["pending"] == 2
 
     prompt = connected.python("from requrv_kb.prompt import personal_section; print(personal_section({}))",
@@ -116,7 +117,7 @@ def test_a_library_change_asks_and_keep_restores_the_personal_version(connected,
 
     assert _kb_as(connected, "marketing", "resolve", "--kind", "soul", "--choice", "keep")["choice"] == "keep"
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
-    assert not (bot / "skills" / "brand" / "SKILL.md").read_text() == MIO_BRAND
+    assert (bot / "skills" / "brand" / "SKILL.md").read_text() == MIO_BRAND
 
     assert _kb_as(connected, "marketing", "resolve", "--kind", "skill", "--name", "brand",
                   "--choice", "take")["choice"] == "take"
@@ -134,7 +135,7 @@ def test_the_question_stays_until_answered_and_a_new_release_does_not_overwrite(
     _publish(kb, "3.0.0")  # another bump, same SOUL as 2.0.0
     result = connected.kb("update", "marketing")
     assert result["pending"] == [{"kind": "soul", "name": ""}]
-    assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL
 
 
 def test_the_personal_authorisation_file_narrows_the_catalogue(connected, kb):

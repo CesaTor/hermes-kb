@@ -137,24 +137,26 @@ def personal_section(_session: Mapping[str, Any] | None = None) -> str:
     folder = mirror.bot_dir(conn, bot)
     lines = [
         "## Versioni personali da decidere (ReQurv KB)",
-        f"Il bot di libreria «{bot}» è passato alla versione {record.get('base_version')}. La nuova "
-        "versione è quella live; la copia personale dell'operatore è in proposte/ e non è andata persa.",
+        f"Il bot di libreria «{bot}» ha una nuova versione ({record.get('base_version')}). La tua "
+        "versione personale è rimasta live; la nuova versione è conservata ma non è stata applicata.",
         "Al primo uso di ognuna di queste, spiega in massimo 5 righe la differenza e chiedi se tenere la sua "
         "versione o prendere la nuova. Nelle righe qui sotto «-» è la sua versione e «+» è quella nuova.",
         "Registra la risposta con lo strumento kb_personal: "
         "{\"action\": \"decide\", \"kind\": \"soul\"|\"skill\", \"name\": \"...\", \"choice\": \"keep\"|\"take\"}. "
-        "Se non risponde, non insistere: la nuova versione resta live e la sua copia resta in proposte/.",
+        "Se non risponde, non insistere: la versione personale resta live.",
     ]
     for item in pending:
         kind = str(item.get("kind") or "")
         name = str(item.get("name") or "")
+        incoming = personal.incoming_path(profile, item)
         if kind == "soul":
-            diff = _diff(folder / "SOUL.md", profile / "SOUL.md")
+            diff = _diff(folder / "SOUL.md", incoming or (profile / "SOUL.md"))
             lines += ["### SOUL.md", diff or "(differenza non leggibile)"]
         elif kind == "skill":
             found = personal.skill_dir(profile / "skills", name)
+            incoming_skill = incoming / "SKILL.md" if incoming is not None else None
             diff = _diff(folder / "skills" / name / "SKILL.md",
-                         (found / "SKILL.md") if found else Path("/non-esiste"))
+                         incoming_skill or ((found / "SKILL.md") if found else Path("/non-esiste")))
             lines += [f"### Skill «{name}»", diff or "(differenza non leggibile)"]
     text = "\n".join(lines)
     if len(text) > _PROMPT_BUDGET:

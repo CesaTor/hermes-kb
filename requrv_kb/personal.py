@@ -10,19 +10,20 @@ From those three an update decides:
 
 * ``reapply`` — the operator has their own copy but the library did not change that file: the
   personal copy is restored silently after the update;
-* ``conflict`` — both changed: the certified version stays live and the question is left for the
-  operator at the next conversation (``pending``);
+* ``conflict`` — both changed: the personal version stays live, the certified version is staged
+  locally and the question is left for the operator at the next conversation (``pending``);
 * ``clean`` — nothing personal: the certified file is simply updated.
 
 The question is answered in chat through the ``kb_personal`` tool or ``hermes kb resolve``; "keep"
-puts the personal copy back over the new certified file, "take" discards it (and with it the copy
-in the proposals folder, because deleting there is what tells the IT a change was integrated).
+keeps the personal copy live, "take" applies the staged certified version and discards the copy in
+the proposals folder (because deleting there is what tells the IT a change was integrated).
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -33,6 +34,7 @@ from .paths import KBError, read_json, write_json
 logger = logging.getLogger(__name__)
 
 FILENAME = ".requrv-kb-personal.json"
+INCOMING_DIRNAME = ".requrv-kb-incoming"
 _SKIP = frozenset({".git", "__pycache__", ".pytest_cache", ".DS_Store"})
 KEEP, TAKE = "keep", "take"
 
@@ -116,7 +118,6 @@ def _entry(base: Optional[str], live: Optional[str]) -> dict[str, Any]:
     # update.
     personal = live if live is not None and live != base else None
     return {"base_hash": base, "live_hash": live, "personal_hash": personal}
-
 
 def record_install(profile: Path, pkg: package.Package) -> dict[str, Any]:
     """Start the record after an install: the package's content is the base."""
@@ -250,6 +251,67 @@ def plan(profile: Path, pkg: package.Package, conn: Any = None) -> dict[str, Any
     }
 
 
+def incoming_path(profile: Path, item: dict[str, Any]) -> Optional[Path]:
+    """The staged certified file for a pending conflict, when it is still available."""
+    raw = item.get("incoming")
+    if not isinstance(raw, str) or not raw:
+        return None
+    base = Path(profile) / INCOMING_DIRNAME
+    target = base / raw
+    try:
+        target.relative_to(base)
+    except ValueError:
+        return None
+    return target if target.exists() else None
+
+
+def _stage_incoming(profile: Path, pkg: package.Package, kind: str, name: str) -> Optional[str]:
+    """Keep the certified version of a conflicting file inside the profile, outside the KB."""
+    root = Path(profile) / INCOMING_DIRNAME / str(pkg.version)
+    try:
+        if kind == "soul":
+            source = Path(pkg.folder) / "SOUL.md"
+            target = root / "SOUL.md"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        else:
+            source = skill_dir(Path(pkg.folder) / "skills", name)
+            if source is None:
+                return None
+            target = root / "skills" / name
+            shutil.rmtree(target, ignore_errors=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(source, target)
+        return target.relative_to(Path(profile) / INCOMING_DIRNAME).as_posix()
+    except OSError:
+        logger.warning("requrv-kb: non ho potuto conservare la nuova versione di %s", name or "SOUL",
+                       exc_info=True)
+        return None
+
+
+def _apply_incoming(profile: Path, item: dict[str, Any]) -> None:
+    source = incoming_path(profile, item)
+    if source is None:
+        raise KBError("La nuova versione non è più disponibile: riallinea il bot e riprova.")
+    kind, name = str(item.get("kind") or ""), str(item.get("name") or "")
+    if kind == "soul":
+        shutil.copy2(source, Path(profile) / "SOUL.md")
+        return
+    target = skill_dir(Path(profile) / "skills", name) or Path(profile) / "skills" / name
+    shutil.rmtree(target, ignore_errors=True)
+    shutil.copytree(source, target)
+
+
+def _clear_incoming(profile: Path, item: dict[str, Any]) -> None:
+    source = incoming_path(profile, item)
+    if source is None:
+        return
+    if source.is_dir():
+        shutil.rmtree(source, ignore_errors=True)
+    else:
+        source.unlink(missing_ok=True)
+
+
 def apply_after_update(profile: Path, pkg: package.Package, planned: dict[str, Any],
                        conn: Any) -> dict[str, Any]:
     """Re-apply or hold back the personal copies, now that Hermes wrote the new version."""
@@ -275,10 +337,20 @@ def apply_after_update(profile: Path, pkg: package.Package, planned: dict[str, A
                 logger.warning("requrv-kb: la copia personale di %s non è più in proposte/", name or "SOUL")
                 entry["personal_hash"] = None
         elif state == "conflict" and entry.get("personal_hash"):
+            restored = False
+            try:
+                mirror.restore(profile, conn, bot, kind, name)
+                restored = True
+            except KBError:
+                logger.warning("requrv-kb: la copia personale di %s non è più in proposte/", name or "SOUL")
+            staged = _stage_incoming(profile, pkg, kind, name)
             pending[_key(kind, name)] = {
                 "kind": kind, "name": name, "from_version": from_version, "to_version": pkg.version,
                 "since": datetime.now(UTC).isoformat(timespec="seconds"),
+                **({"incoming": staged} if staged else {}),
             }
+            if restored:
+                entry["live_hash"] = entry.get("personal_hash")
         else:
             entry["personal_hash"] = None
         entry["base_hash"] = new_hash
@@ -322,10 +394,13 @@ def decide(profile: Path, conn: Any, kind: str, name: str, choice: str) -> dict[
     if choice == KEEP:
         mirror.restore(profile, conn, bot, kind, name)
         entry["live_hash"] = entry.get("personal_hash")
+        _clear_incoming(profile, item)
     else:
+        _apply_incoming(profile, item)
         mirror.discard(profile, conn, bot, kind, name)
         entry["personal_hash"] = None
         entry["live_hash"] = _live(profile, kind, name) or entry.get("live_hash")
+        _clear_incoming(profile, item)
     record["pending"] = [p for p in record.get("pending", []) if p is not item]
     record["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     write(profile, record)
