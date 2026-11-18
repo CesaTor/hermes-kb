@@ -202,9 +202,36 @@ def _state(entry: Optional[dict[str, Any]], incoming: Optional[str], unanswered:
     return "reapply"
 
 
+def _refresh_live(profile: Path, record: dict[str, Any]) -> bool:
+    """Re-read the live SOUL/skills and adopt a manual edit that the write hook did not observe."""
+    changed = False
+
+    def one(kind: str, name: str, entry: dict[str, Any]) -> None:
+        nonlocal changed
+        live = _live(profile, kind, name)
+        if live != entry.get("live_hash"):
+            entry["live_hash"] = live
+            changed = True
+        if entry.get("personal_hash"):
+            personal = entry["personal_hash"]
+        else:
+            personal = live if live is not None and live != entry.get("base_hash") else None
+        if personal != entry.get("personal_hash"):
+            entry["personal_hash"] = personal
+            changed = True
+
+    one("soul", "", record.setdefault("soul", {}))
+    for name, entry in (record.get("skills") or {}).items():
+        if isinstance(entry, dict):
+            one("skill", name, entry)
+    return changed
+
+
 def plan(profile: Path, pkg: package.Package, conn: Any = None) -> dict[str, Any]:
     """What the update is about to do with the personal copies, computed before it runs."""
     record = ensure(profile, pkg)
+    if _refresh_live(profile, record):
+        write(profile, record)
     if conn is not None:
         from . import mirror
 

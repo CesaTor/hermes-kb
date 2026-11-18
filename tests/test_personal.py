@@ -69,6 +69,20 @@ def test_an_update_that_did_not_touch_the_file_keeps_the_operators_version_silen
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
 
 
+def test_a_manual_soul_edit_is_detected_on_the_next_update(connected, kb):
+    connected.kb("install", "marketing")
+    bot = connected.profile("marketing")
+    (bot / "SOUL.md").write_text(MIO_SOUL, encoding="utf-8")  # editor, not the write tool
+    _publish(kb, "2.0.0", soul="# Marketing v2\n")
+
+    result = connected.kb("update", "marketing")
+    assert result["pending"] == [{"kind": "soul", "name": ""}]
+    assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"
+    assert (kb["personal"] / "proposte" / "marketing" / "SOUL.md").read_text() == MIO_SOUL
+    assert _kb_as(connected, "marketing", "resolve", "--kind", "soul", "--choice", "keep")["choice"] == "keep"
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL
+
+
 def test_a_personal_soul_from_before_the_feature_is_adopted_on_the_first_update(connected, kb):
     connected.kb("install", "marketing")
     bot = connected.profile("marketing")
