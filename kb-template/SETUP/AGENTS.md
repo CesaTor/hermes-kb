@@ -69,7 +69,12 @@ Se la cartella personale è un'isola separata, aggiungi `--personal "<cartella p
 
 Poi `hermes kb check`. Se segnala file "non ancora scaricati", di' all'utente di rendere la cartella
 disponibile offline nell'app di sincronizzazione (Drive: "Disponibile offline" o modalità mirroring;
-Nextcloud: disattiva i file virtuali per quella cartella), aspetta e ripeti il controllo.
+Nextcloud: disattiva i file virtuali o scegli "Rendi disponibile offline" per l'intera cartella KB),
+aspetta e ripeti il controllo.
+
+**Non proseguire con `reconcile` finché `hermes kb check` non è `OK`.** I file `compressed/dataless`
+(Nextcloud/OneDrive) non sono leggibili: il plugin li rifiuta con «Alcuni file della libreria non
+sono ancora scaricati». Non è un errore del plugin e non si risolve con `--force`.
 
 ## 5. Installa i bot
 
