@@ -83,9 +83,16 @@ hermes kb reconcile
 ```
 
 Installa tutti i bot che le aree dell'utente abilitano. Mostra all'utente l'elenco risultante
-(`hermes kb status`). Da qui in poi il plugin controlla da solo ogni 30 minuti: aggiorna i bot e
-reinstalla quelli cancellati; **non rimuove mai** un bot (uno non più abilitato resta, e viene
-segnalato come `not-allowed`).
+(`hermes kb status`). Da qui in poi il plugin controlla la libreria all'avvio di Hermes e a ogni nuova
+conversazione con un bot: aggiorna i bot e reinstalla quelli cancellati; **non rimuove mai** un bot
+(uno non più abilitato resta, e viene segnalato come `not-allowed`). Non c'è un controllo periodico:
+«Controlla ora» in Impostazioni e `hermes kb reconcile` lo fanno su richiesta.
+
+Se l'operatore ha personalizzato il SOUL o una skill e la libreria pubblica una versione che tocca
+quel file, il bot al primo uso spiega la differenza e chiede se tenere la versione dell'operatore o
+prendere la nuova. La risposta si registra con il tool `kb_personal` oppure con
+`hermes -p <bot> kb resolve --kind soul|skill --choice keep|take`; «tengo la mia» lascia la copia
+personale, «prendo la nuova» la rimuove dalle proposte.
 
 Se nella cartella personale c'è un `.autorizzazioni.yaml`, quello restringe i bot installabili:
 se manca valgono i `bots.yaml` delle aree. Non crearlo: lo fornisce l'IT.

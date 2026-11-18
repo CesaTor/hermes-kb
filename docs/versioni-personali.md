@@ -46,7 +46,9 @@ Operatori/<nome>/
 `on_skill_lifecycle` (skill) copiano il file in `proposte/<bot>/` e aggiornano gli hash. La modifica
 è già live: il bot la usa dalla conversazione successiva.
 
-**Update.** `personal.plan` legge gli hash prima che Hermes scriva. Poi, per ogni file:
+**Update.** Il controllo della libreria parte all'avvio di Hermes e a ogni nuova conversazione con
+un bot; non c'è un timer periodico. `personal.plan` legge gli hash prima che Hermes scriva. Poi, per
+ogni file:
 
 | Stato | Cosa succede |
 |---|---|

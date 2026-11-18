@@ -179,7 +179,7 @@ def _kb_capture_knowledge(args: dict[str, Any], *, session_id: str = "", **_: An
 
 
 def register(ctx):
-    from .requrv_kb import autosync, cli, locks, mirror, prompt, watchdog
+    from .requrv_kb import autosync, cli, locks, mirror, prompt
 
     ctx.register_cli_command("kb", "Collega la KB aziendale e gestisci i bot di libreria",
                              cli.setup_parser, cli.cli_handler)
@@ -191,8 +191,6 @@ def register(ctx):
     ctx.register_hook("post_tool_call", mirror.on_tool_call)
     ctx.register_hook("on_skill_lifecycle", mirror.on_skill_lifecycle)
     ctx.register_hook("on_session_start", autosync.on_session_start)
-    watchdog.start()
-    ctx.on_unload(watchdog.stop)
     ctx.register_tool(name="kb_personal", toolset="kb", schema=_KB_PERSONAL_SCHEMA,
                       handler=_kb_personal, emoji="🔁",
                       description=("Versioni personali del bot di libreria: elenca quelle in attesa di una "

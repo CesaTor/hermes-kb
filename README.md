@@ -23,11 +23,11 @@ Guida completa all'installazione, aggiornamento e installazione guidata da Herme
 | Provider del coordinatore copiato nel bot (modello, endpoint `providers.<nome>`, chiave) | `requrv_kb/profile_config.py` |
 | Percorsi della KB nel prompt di ogni nuova sessione | `requrv_kb/prompt.py` |
 | File non scaricati dal cloud rilevati prima di copiare | `requrv_kb/cloud_files.py` |
-| Allineamento automatico: installa i bot abilitati che mancano e aggiorna quelli cambiati (ogni 30 min, all'avvio, a ogni nuova conversazione); `hermes kb reconcile`. Non rimuove mai un bot | `requrv_kb/watchdog.py`, `requrv_kb/library.py` |
+| Allineamento automatico: installa i bot abilitati che mancano e aggiorna quelli cambiati (all'avvio e a ogni nuova conversazione); `hermes kb reconcile`. Non rimuove mai un bot | `requrv_kb/watchdog.py`, `requrv_kb/library.py` |
 | Autorizzazioni per operatore: `.autorizzazioni.yaml` nella cartella personale restringe i bot installabili | `requrv_kb/authz.py` |
 | Cattura passiva di fatti e pratiche riutilizzabili durante le conversazioni con i bot di libreria | `requrv_kb/knowledge_capture.py`, tool `kb_capture_knowledge` |
 | Revisione IT: proposte e conoscenze di tutti gli operatori, differenze, accetta/rifiuta, aggiornamenti | `requrv_kb/it.py`, tool `kb_proposals`/`kb_updates`, skill `revisione-proposte` |
-| Impostazioni → Plugin → **ReQurv KB**: collegamento, intervallo, ultimo controllo, «Controlla ora» (nessuna pagina Libreria) | `desktop/plugin.js` + `dashboard/plugin_api.py` |
+| Impostazioni → Plugin → **ReQurv KB**: collegamento, ultimo controllo, «Controlla ora» (nessuna pagina Libreria) | `desktop/plugin.js` + `dashboard/plugin_api.py` |
 | Tema ReQurv (colori e font Syne incorporati, licenza OFL in `desktop/OFL-syne.txt`), scelto una sola volta alla prima attivazione; «Tema ReQurv» in Impostazioni lo riapplica | `desktop/plugin.js` |
 | Layout `requrv-kb:minimal` e voci del menu laterale nascoste (Messaging, Artifacts, Scheduled jobs, Kanban) | `desktop/plugin.js` |
 | Comandi `hermes kb ...` e `/kb ...` in chat, skill `requrv-kb:setup` | `requrv_kb/cli.py` |
@@ -53,9 +53,7 @@ l'installazione da terminale (`hermes plugins install … --enable`) lascia spen
 usarla, riavvia Hermes Desktop e attiva **ReQurv KB** in Capabilities → Plugins. Aggiornamenti:
 `hermes plugins update requrv-kb`.
 
-**Senza la parte Desktop** funzionano: allineamento automatico (watchdog, ogni 30 minuti mentre Hermes è
-aperto), blocchi dei bot di libreria, percorsi della KB nel prompt, comandi `hermes kb ...` e `/kb ...`,
-skill `requrv-kb:setup`. **Serve la parte Desktop** per: la pagina Impostazioni → Plugin → ReQurv KB, il
+**Senza la parte Desktop** funzionano: allineamento automatico (all'avvio e a ogni nuova conversazione), blocchi dei bot di libreria, percorsi della KB nel prompt, comandi `hermes kb ...` e `/kb ...`, skill `requrv-kb:setup`. **Serve la parte Desktop** per: la pagina Impostazioni → Plugin → ReQurv KB, il
 controllo all'avvio dell'app, il tema ReQurv, il layout «ReQurv minimal» (id `requrv-kb:minimal`, applicabile
 anche dal modello con lo strumento `set_theme`) e la scelta delle voci del menu laterale.
 
@@ -202,25 +200,26 @@ Sessions, revisione e terminale non sono nominati: Hermes li riprende dal layout
 
 ## Allineamento automatico
 
-Mentre Hermes (Desktop o gateway) è aperto, il plugin allinea i bot alla libreria **ogni 30 minuti**
-(impostabile, minimo 5, in Impostazioni → Plugin → ReQurv KB), **all'avvio dell'app** e **a ogni nuova
-conversazione** con un bot di libreria (questa solo per aggiornare quel bot). «Controlla ora» o
-`hermes kb reconcile` lo fanno subito. Un controllo:
+Il plugin allinea i bot alla libreria **all'avvio di Hermes** e **a ogni nuova conversazione** con un
+bot di libreria (questa solo per aggiornare quel bot). «Controlla ora» in Impostazioni → Plugin →
+ReQurv KB, oppure `hermes kb reconcile`, lo fanno subito. **Non c'è un controllo periodico e non c'è
+un thread in background.**
 
-- **installa** ogni bot abilitato dalle aree e non installato: un bot eliminato dall'utente torna entro
-  un intervallo, **nuovo e senza le sue chat e la sua memoria** (il registro, i backup e le chat stanno
-  nella cartella del profilo e se ne vanno con lui);
+Un controllo:
+
+- **installa** ogni bot abilitato dalle aree e non installato: un bot eliminato dall'utente torna
+  all'avvio o alla conversazione successiva, **nuovo e senza le sue chat e la sua memoria** (il
+  registro, i backup e le chat stanno nella cartella del profilo e se ne vanno con lui);
 - **aggiorna** i bot la cui versione è cambiata;
 - **segnala** come `not-allowed` i bot che le aree non abilitano più, senza toccarli: chat, memoria e
   profilo restano dove sono, e l'operatore decide se eliminarli.
 
 I risultati (`installed`, `updated`, `unchanged`, `error`, `source-unavailable`, `not-allowed`) sono
-nei log e in Impostazioni. Ogni processo Hermes avvia un thread che guarda ogni 5 minuti,
-ma l'esecuzione è decisa da un **lease valido per tutto il computer** in `<radice Hermes>/plugin-data/requrv-kb/watchdog/`:
-un file con l'ora dell'ultimo controllo e un lock di file non bloccante (`fcntl` su POSIX, `msvcrt` su
-Windows), così gira al massimo un controllo alla volta e uno per intervallo, qualunque sia il numero di
-profili o processi. Il thread aspetta 60 s prima del primo controllo, quindi un comando `hermes ...`
-di breve durata non fa nulla.
+nei log e in Impostazioni. Un **lease valido per tutto il computer** in
+`<radice Hermes>/plugin-data/requrv-kb/watchdog/` impedisce a due controlli manuali o all'avvio di
+sovrapporsi: un file con l'ora dell'ultimo controllo e un lock di file non bloccante (`fcntl` su
+POSIX, `msvcrt` su Windows). Se un processo muore, il sistema operativo rilascia il lock.
+
 
 ## Test
 

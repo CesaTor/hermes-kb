@@ -239,7 +239,7 @@ def _library_profile(profile_name: str) -> tuple[Path, dict[str, Any]]:
 def _update(target: Path, record: dict[str, Any], pkg: package.Package, conn: kb_connection.Connection) -> dict[str, Any]:
     package.assert_installable(pkg)
     from_version = str(record.get("version") or "")
-    planned = personal.plan(target, pkg)
+    planned = personal.plan(target, pkg, conn)
     ledger.snapshot(target, from_version, pkg.version, package.owned_paths(pkg, preserve_config=True))
     hermes.run(["profile", "update", target.name, "--yes"])
     profile_config.apply_managed(target, package.staged_config(pkg), pkg.config_managed)

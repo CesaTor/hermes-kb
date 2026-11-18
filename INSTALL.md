@@ -133,7 +133,8 @@ Atteso:
 - `hermes kb status` mostra i bot di libreria installati.
 
 Su Hermes Desktop, in **Impostazioni → Plugin → ReQurv KB**, devono comparire il collegamento,
-l'intervallo del controllo automatico, l'ultimo controllo e **Controlla ora**.
+l'ultimo controllo e **Controlla ora**. Il controllo parte all'avvio dell'app e a ogni nuova
+conversazione con un bot; non c'è un intervallo periodico da configurare.
 
 ## Aggiornamento
 

@@ -133,6 +133,32 @@ def mirror_skill(profile: Path, conn: Any, bot: str, name: str) -> bool:
     return True
 
 
+def adopt_existing(profile: Path, conn: Any, bot: str) -> None:
+    """Copy a pre-feature personal SOUL/skill into proposals without changing its hashes.
+
+    ``personal.ensure`` marks a live file that differs from the package as personal; this makes the
+    "keep mine" answer possible by putting that file where the IT can see it.
+    """
+    from . import personal as _personal
+
+    profile = Path(profile)
+    record = _personal.read(profile)
+    if not record:
+        return
+    folder = bot_dir(conn, bot)
+    soul = record.get("soul") or {}
+    if soul.get("personal_hash") and not (folder / "SOUL.md").is_file() and (profile / "SOUL.md").is_file():
+        _copy_file(profile / "SOUL.md", folder / "SOUL.md")
+    for name, entry in (record.get("skills") or {}).items():
+        if not isinstance(entry, dict) or not entry.get("personal_hash"):
+            continue
+        source = _personal.skill_dir(profile / SKILLS_DIRNAME, name)
+        target = folder / SKILLS_DIRNAME / name
+        if source is not None and not target.exists():
+            _copy_tree(source, target)
+    refresh(profile, conn, bot)
+
+
 def _owned_skill_name(profile: Path, rel: str) -> Optional[str]:
     """The shipped skill *rel* (profile-relative) belongs to, when it does."""
     record = ledger.read(profile) or {}

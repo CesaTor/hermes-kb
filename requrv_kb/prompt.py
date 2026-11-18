@@ -137,13 +137,13 @@ def personal_section(_session: Mapping[str, Any] | None = None) -> str:
     folder = mirror.bot_dir(conn, bot)
     lines = [
         "## Versioni personali da decidere (ReQurv KB)",
-        f"Il bot di libreria «{bot}» è passato alla versione {record.get('base_version')}, ma l'operatore "
-        "aveva una versione propria di quanto segue: la libreria non l'ha sovrascritta.",
+        f"Il bot di libreria «{bot}» è passato alla versione {record.get('base_version')}. La nuova "
+        "versione è quella live; la copia personale dell'operatore è in proposte/ e non è andata persa.",
         "Al primo uso di ognuna di queste, spiega in massimo 5 righe la differenza e chiedi se tenere la sua "
         "versione o prendere la nuova. Nelle righe qui sotto «-» è la sua versione e «+» è quella nuova.",
         "Registra la risposta con lo strumento kb_personal: "
         "{\"action\": \"decide\", \"kind\": \"soul\"|\"skill\", \"name\": \"...\", \"choice\": \"keep\"|\"take\"}. "
-        "Se non risponde, non insistere: vale la sua.",
+        "Se non risponde, non insistere: la nuova versione resta live e la sua copia resta in proposte/.",
     ]
     for item in pending:
         kind = str(item.get("kind") or "")

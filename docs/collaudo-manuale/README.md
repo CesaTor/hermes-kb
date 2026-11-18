@@ -4,7 +4,7 @@ Data: 18 novembre 2026
 Ambito: plugin `requrv-kb` su Hermes CLI e Hermes Desktop.
 Scopo: verificare a mano i flussi che la suite automatica non può coprire davvero — installazione,
 chat reale, sincronizzazione cloud, permessi, Desktop e Windows. La suite automatica resta la
-verifica di regressione: `96 passed` con `python3.13 -m pytest tests -q`.
+verifica di regressione: `92 passed` con `python3.13 -m pytest tests -q`.
 
 Questa guida non è un elenco di comandi da eseguire alla cieca. Ogni prova ha un risultato atteso e
 un'evidenza da conservare. Se un risultato non torna, fermati e annota il punto esatto: un test
@@ -252,7 +252,7 @@ la release pubblica, salta A2 oppure sostituisci l'installazione con la copia lo
 #### B1 — Connessione multi-cartella
 
 Esegui i comandi della sezione 3.3. Controlla anche il file `connection.json`: `roots`, `operator`,
-`personal`, `watchdog_minutes`.
+`personal`.
 
 **Atteso:** `kb check` mostra le cartelle e `OK`; `kb list` di Mario mostra solo `marketing`.
 **Errore atteso:** senza connessione, `hermes kb list` risponde
@@ -301,7 +301,7 @@ pacchetto non elencato compare senza `*`.
    equivale a `HERMES_HOME="$H_OP" hermes kb disconnect`.
 2. `HERMES_HOME="$H_OP" hermes kb check` deve dire che il computer non è collegato; i bot restano in
    `HERMES_HOME="$H_OP" hermes kb status`.
-3. Ricollega le stesse cartelle. L'intervallo del watchdog deve restare quello scelto prima.
+3. Ricollega le stesse cartelle: i bot restano collegati alla libreria.
 4. Danneggia `connection.json` (copia di backup, poi scrivi `{rotto`):
    `HERMES_HOME="$H_OP" hermes kb check` deve trattarlo come non collegato, non crashare; ripristina
    o ricollega.
@@ -745,7 +745,7 @@ Con due account reali:
 
 ---
 
-### H. Allineamento automatico e watchdog
+### H. Allineamento e controllo manuale
 
 #### H1 — Riconciliazione idempotente
 
@@ -786,18 +786,23 @@ Rinomina `$KB/Biblioteca-Agenti/marketing` in `marketing-off` e lancia
 **Atteso:** `source-unavailable`, nessuna reinstallazione e nessuna cancellazione; il bot installato
 resta utilizzabile. Ripristina il nome e riconcilia.
 
-#### H5 — Intervallo, “Controlla ora” e lease
+#### H5 — Avvio, nuova conversazione e controllo manuale
 
-1. Desktop → ReQurv KB: imposta `5` minuti e salva. Il valore deve restare dopo un riavvio.
-2. `connection.json` deve contenere `watchdog_minutes: 5`.
-3. Premi **Controlla ora**: deve comparire l'esito e “Ultimo controllo” aggiornato.
-4. Apri due finestre Hermes o due processi e premi “Controlla ora” insieme: uno deve dire che un
+Non esiste un controllo periodico. Verifica i tre trigger reali:
+
+1. **Avvio.** Aggiungi un bot in un'area (o cambia la versione di uno installato), chiudi e riapri
+   Hermes Desktop. All'avvio il bot deve comparire/aggiornarsi; “Ultimo controllo” cambia.
+2. **Nuova conversazione.** Con un bot di libreria, cambia la versione del suo pacchetto e apri una
+   nuova conversazione: il bot aggiorna il proprio profilo all'inizio della sessione; la nuova
+   versione vale dalla conversazione successiva.
+3. **Controllo manuale.** Premi **Controlla ora**: deve comparire l'esito e “Ultimo controllo”
+   aggiornato. Apri due finestre Hermes o due processi e premilo insieme: uno deve dire che un
    controllo è già in corso; non devono girare due riconciliazioni.
-5. Controlla `plugin-data/requrv-kb/watchdog/`: file di stato e lock del computer.
+4. Controlla `plugin-data/requrv-kb/watchdog/`: file di stato e lock del computer. Non deve esserci
+   un intervallo configurato né un thread periodico.
 
-**Nota:** il thread automatico aspetta 60 secondi prima del primo controllo. Per verificare davvero
-l'intervallo di 5 minuti puoi attendere, ma per il collaudo funzionale basta “Controlla ora” e la
-persistenza dell'intervallo.
+**Atteso:** nessun aggiornamento “a orologio”; i trigger sono avvio, nuova conversazione e richiesta
+manuale.
 
 ---
 
@@ -809,8 +814,9 @@ Apri Impostazioni → Plugin → **ReQurv KB**. Se il Desktop usa una home diver
 qui la stessa KB (o una copia) prima di proseguire.
 
 **Atteso:** stato del collegamento con operatore, cartelle e cartella personale; eventuali problemi
-in rosso e avvisi in grigio; intervallo, ultimo controllo, risultati; pulsanti **Modifica
-collegamento**, **Scollega**, **Salva**, **Controlla ora**; sezione **Aspetto** con **Tema ReQurv**.
+in rosso e avvisi in grigio; ultimo controllo e risultati; pulsanti **Modifica collegamento**,
+**Scollega**, **Controlla ora**; sezione **Aspetto** con **Tema ReQurv**. Non c'è un campo
+“intervallo”: il controllo avviene all'avvio e a ogni nuova conversazione.
 Prova a scollegare e ricollegare dalla pagina: i bot restano.
 **Nota:** la pagina risponde quando il profilo attivo nell'app è il coordinatore o un bot di
 libreria; con un profilo personale può non caricare. È un limite noto, non un errore di questa prova.
@@ -908,7 +914,7 @@ su macOS.
 
 #### K5 — Desktop
 
-1. Pagina Impostazioni, collegamento, intervallo, “Controlla ora”.
+1. Pagina Impostazioni, collegamento, ultimo controllo, “Controlla ora”.
 2. Tema ReQurv: prima applicazione, scelta di un altro tema, riapplicazione dal pulsante.
 3. Layout minimal, voci del menu, Sessions, riavvio.
 4. Controllo all'avvio con un bot nuovo o aggiornato.

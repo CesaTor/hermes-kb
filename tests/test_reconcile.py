@@ -74,10 +74,3 @@ def test_a_personal_bot_with_the_same_name_is_never_overwritten(connected):
     result = by_bot(connected.kb("reconcile")["results"])["marketing"]
     assert result["action"] == "error" and "Esiste già" in result["error"]
     assert not (connected.profile("marketing") / ".library-owned.json").exists()
-
-
-def test_the_interval_is_a_setting_that_survives_reconnecting(connected, kb):
-    assert connected.python(
-        "from requrv_kb import connection as c\nprint(c.load().watchdog_minutes)\n"
-        "c.set_watchdog_minutes(10)\nk = c.load()\nc.save(c.connect(list(k.roots), personal=k.personal))\nprint(c.load().watchdog_minutes)",
-        connected.root).split() == ["30", "10"]

@@ -1,5 +1,5 @@
 // ReQurv KB - Desktop half. Loaded uncompiled as plain ESM: no JSX, no TypeScript.
-// One screen, Settings -> Plugins -> ReQurv KB: the connection, the watchdog and its last results.
+// One screen, Settings -> Plugins -> ReQurv KB: the connection, the last check and its results.
 import {
   Badge, Button, Codicon, ConfirmDialog, Input, SIDEBAR_NAV_PREFS_AREA, THEMES_AREA, cn, haptic, host, requestTheme
 } from '@hermes/plugin-sdk'
@@ -35,7 +35,6 @@ function createApi(ctx) {
     connect: body => post('/connection', body),
     disconnect: () => ctx.rest('/connection', { method: 'DELETE' }),
     watchdog: () => ctx.rest('/watchdog'),
-    setInterval: minutes => post('/watchdog', { minutes }),
     reconcile: () => post('/watchdog/reconcile', {})
   }
 }
@@ -166,7 +165,7 @@ function ConnectForm({ ctx, api, initial, check, onConnected, onCancel }) {
   ])
 }
 
-// --------------------------------------------------------------- watchdog
+// ----------------------------------------------------------- reconciliation
 
 const ACTION = {
   installed: { label: 'installato', variant: 'success' },
@@ -219,7 +218,6 @@ function ResultRows({ run }) {
 }
 
 function WatchdogSection({ api, status, onChanged }) {
-  const [minutes, setMinutes] = useState(String(status.interval_minutes))
   const [busy, setBusy] = useState(false)
   const run = status.last_run
   const s = run && run.summary
@@ -238,33 +236,12 @@ function WatchdogSection({ api, status, onChanged }) {
     }
   }
 
-  const save = async () => {
-    try {
-      await api.setInterval(Number(minutes))
-      ok('Intervallo salvato.')
-      await onChanged()
-    } catch (e) {
-      fail(e)
-    }
-  }
-
-  return h(Section, { title: 'Allineamento automatico' },
+  return h(Section, { title: 'Allineamento' },
     hs('div', { className: 'flex flex-col gap-3' }, [
-      h(Note, {}, 'Mentre Hermes è aperto, la libreria viene controllata a intervalli: i bot con una nuova versione si '
-        + 'aggiornano, quelli abilitati ma mancanti (eliminati o mai installati) tornano senza le loro chat, e i bot '
-        + 'aziendali non più abilitati restano sul computer, segnalati come tali: decidi tu se eliminarli. '
-        + 'I bot che hai creato o duplicato restano.'),
-      hs('div', { className: 'flex flex-wrap items-center gap-2' }, [
-        h('span', { className: 'text-xs text-(--ui-text-secondary)' }, 'Controlla ogni'),
-        h(Input, {
-          className: 'w-20', type: 'number', min: status.min_minutes, value: minutes,
-          'aria-label': 'Minuti tra due controlli', onChange: e => setMinutes(e.target.value)
-        }),
-        h('span', { className: 'text-xs text-(--ui-text-secondary)' }, 'minuti'),
-        h(Button, {
-          size: 'sm', variant: 'secondary', disabled: busy || Number(minutes) === status.interval_minutes, onClick: save
-        }, 'Salva')
-      ]),
+      h(Note, {}, 'La libreria viene controllata all’avvio di Hermes e a ogni nuova conversazione con un bot: '
+        + 'i bot con una nuova versione si aggiornano, quelli abilitati ma mancanti (eliminati o mai installati) '
+        + 'tornano senza le loro chat, e i bot aziendali non più abilitati restano sul computer, segnalati come '
+        + 'tali: decidi tu se eliminarli. I bot che hai creato o duplicato restano.'),
       run
         ? hs('div', { className: 'flex flex-col gap-2' }, [
             h(Note, {}, `Ultimo controllo: ${whenText(run.at)} · ${plural(s.installed, 'installato', 'installati')}, `

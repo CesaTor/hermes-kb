@@ -60,10 +60,6 @@ class ProfileBody(BaseModel):
     profile: str
 
 
-class WatchdogBody(BaseModel):
-    minutes: int
-
-
 class DuplicateBody(BaseModel):
     profile: str
     name: str
@@ -136,27 +132,17 @@ async def duplicate(body: DuplicateBody):
     return await _call(library.duplicate, body.profile, body.name)
 
 
-def _watchdog_set(body: WatchdogBody) -> dict[str, Any]:
-    kb_connection.set_watchdog_minutes(body.minutes)
-    return watchdog.status()
-
-
 def _reconcile_now() -> dict[str, Any]:
-    """Check now, whatever the interval; ``busy`` when another process holds the machine-wide lease."""
+    """Check now; ``busy`` when another process holds the machine-wide lease."""
     if kb_connection.load() is None:
         raise KBError("Questo computer non è ancora collegato alla KB.")
-    record = watchdog.run(force=True)
+    record = watchdog.run()
     return {"busy": record is None, **watchdog.status()}
 
 
 @router.get("/watchdog")
 async def get_watchdog():
     return await _call(watchdog.status)
-
-
-@router.post("/watchdog")
-async def post_watchdog(body: WatchdogBody):
-    return await _call(_watchdog_set, body)
 
 
 @router.post("/watchdog/reconcile")

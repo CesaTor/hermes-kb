@@ -69,6 +69,20 @@ def test_an_update_that_did_not_touch_the_file_keeps_the_operators_version_silen
     assert (bot / "SOUL.md").read_text() == MIO_SOUL
 
 
+def test_a_personal_soul_from_before_the_feature_is_adopted_on_the_first_update(connected, kb):
+    connected.kb("install", "marketing")
+    bot = connected.profile("marketing")
+    (bot / ".requrv-kb-personal.json").unlink()  # simulates a bot installed before personal versions
+    (bot / "SOUL.md").write_text(MIO_SOUL, encoding="utf-8")
+    _publish(kb, "2.0.0", soul="# Marketing v2\n")
+
+    result = connected.kb("update", "marketing")
+    assert result["pending"] == [{"kind": "soul", "name": ""}]
+    assert (bot / "SOUL.md").read_text() == "# Marketing v2\n"
+    assert _kb_as(connected, "marketing", "resolve", "--kind", "soul", "--choice", "keep")["choice"] == "keep"
+    assert (bot / "SOUL.md").read_text() == MIO_SOUL
+
+
 def test_a_library_change_asks_and_keep_restores_the_personal_version(connected, kb):
     connected.kb("install", "marketing")
     bot = connected.profile("marketing")

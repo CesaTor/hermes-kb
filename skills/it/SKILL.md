@@ -41,9 +41,9 @@ valutare una modifica a un bot o di allineare i bot della libreria. I tool `kb_p
 
 - `accept` alza la patch (`1.4.0 → 1.4.1`) nel `distribution.yaml` del pacchetto. Se la modifica è
   sostanziale, proponi all'IT un salto di minor (`1.5.0`) e fallo a mano nel file.
-- Dopo l'accettazione i bot degli operatori ricevono la versione al controllo successivo (ogni 30
-  minuti, all'avvio e a ogni nuova conversazione). Chi aveva una versione personale di quel file
-  riceverà la domanda «tieni la tua o prendi la nuova?».
+- Dopo l'accettazione i bot degli operatori ricevono la versione all'avvio o alla conversazione
+  successiva. Chi aveva una versione personale di quel file riceverà la domanda «tieni la tua o
+  prendi la nuova?».
 - `kb_updates` con `action: list` dice cosa la libreria offre e questo computer non ha; `apply`
   installa e aggiorna qui. Non è la stessa cosa di accettare una proposta: quello cambia il
   pacchetto per tutti.

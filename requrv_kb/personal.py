@@ -111,7 +111,11 @@ def certified(pkg: package.Package) -> dict[str, Any]:
 # --- the record ---------------------------------------------------------------------------------
 
 def _entry(base: Optional[str], live: Optional[str]) -> dict[str, Any]:
-    return {"base_hash": base, "live_hash": live, "personal_hash": None}
+    # A profile installed before this feature may already hold a personal SOUL/skill: if the live
+    # content differs from the package it received, adopt it now instead of losing it on the first
+    # update.
+    personal = live if live is not None and live != base else None
+    return {"base_hash": base, "live_hash": live, "personal_hash": personal}
 
 
 def record_install(profile: Path, pkg: package.Package) -> dict[str, Any]:
@@ -133,10 +137,22 @@ def record_install(profile: Path, pkg: package.Package) -> dict[str, Any]:
 def ensure(profile: Path, pkg: package.Package) -> dict[str, Any]:
     """A record for a bot installed before this feature: its current files become the base.
 
-    What the operator changed before the upgrade cannot be known any more, so the first update
-    after it treats the live files as certified. From then on every change is tracked.
+    A file already changed by the operator is adopted as personal and marked for the first conflict,
+    so the first update asks instead of silently replacing it. From then on every change is tracked.
     """
-    return read(profile) or record_install(profile, pkg)
+    record = read(profile)
+    if record:
+        return record
+    record = record_install(profile, pkg)
+    changed = False
+    entries = [record.get("soul") or {}, *(record.get("skills") or {}).values()]
+    for entry in entries:
+        if entry.get("personal_hash") and entry.get("base_hash") != entry.get("live_hash"):
+            entry["base_hash"] = entry.get("live_hash")
+            changed = True
+    if changed:
+        write(profile, record)
+    return record
 
 
 def note_personal(profile: Path, kind: str, name: str = "") -> None:
@@ -186,9 +202,13 @@ def _state(entry: Optional[dict[str, Any]], incoming: Optional[str], unanswered:
     return "reapply"
 
 
-def plan(profile: Path, pkg: package.Package) -> dict[str, Any]:
+def plan(profile: Path, pkg: package.Package, conn: Any = None) -> dict[str, Any]:
     """What the update is about to do with the personal copies, computed before it runs."""
     record = ensure(profile, pkg)
+    if conn is not None:
+        from . import mirror
+
+        mirror.adopt_existing(profile, conn, str(record.get("bot") or pkg.name))
     incoming = certified(pkg)
     waiting = {_key(str(p.get("kind")), str(p.get("name") or ""))
                for p in record.get("pending", []) if isinstance(p, dict)}
