@@ -4,7 +4,7 @@ Data: 18 novembre 2026
 Ambito: plugin `requrv-kb` su Hermes CLI e Hermes Desktop.
 Scopo: verificare a mano i flussi che la suite automatica non può coprire davvero — installazione,
 chat reale, sincronizzazione cloud, permessi, Desktop e Windows. La suite automatica resta la
-verifica di regressione: `94 passed` con `python3.13 -m pytest tests -q`.
+verifica di regressione: `95 passed` con `python3.13 -m pytest tests -q`.
 
 Questa guida non è un elenco di comandi da eseguire alla cieca. Ogni prova ha un risultato atteso e
 un'evidenza da conservare. Se un risultato non torna, fermati e annota il punto esatto: un test
