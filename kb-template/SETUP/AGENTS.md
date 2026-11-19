@@ -105,6 +105,10 @@ Il plugin copia inoltre `MEMORY.md`, `USER.md` e, se Holographic è attivo, `mem
 secondo i permessi del cloud e decide se promuovere qualche fatto nella conoscenza condivisa.
 Holographic è opzionale, resta locale al profilo e non va usato come knowledge base aziendale.
 
+Se l'IT ha scelto Holographic come memoria aziendale, esegui `hermes kb memory enable --all` dopo il
+reconcile: installa e abilita il provider nei bot di libreria e lo applica anche ai bot futuri.
+`hermes kb memory status` mostra lo stato.
+
 Se nella cartella personale c'è un `.autorizzazioni.yaml`, quello restringe i bot installabili:
 se manca valgono i `bots.yaml` delle aree. Non crearlo: lo fornisce l'IT.
 

@@ -186,7 +186,7 @@ def register(ctx):
                              cli.setup_parser, cli.cli_handler)
     ctx.register_command("kb", cli.slash_handler,
                          description="KB aziendale: collega, elenca, installa e aggiorna i bot",
-                         args_hint="connect|check|list|status|install|update|sync|reconcile|rollback|duplicate|resolve",
+                         args_hint="connect|check|list|status|install|update|sync|reconcile|rollback|duplicate|resolve|memory",
                          argument_mode="mixed")
     ctx.register_hook("pre_tool_call", locks.pre_tool_call)
     ctx.register_hook("post_tool_call", mirror.on_tool_call)

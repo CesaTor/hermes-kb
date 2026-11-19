@@ -12,6 +12,7 @@ seeds the provider, the personal skills folder and the plugin (:mod:`.profile_co
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import threading
@@ -23,6 +24,8 @@ from . import connection as kb_connection
 from . import hermes, ledger, package, profile_config, authz, personal
 from .paths import KBError, deletion_marker, named_profiles, profile_dir, valid_profile_name
 from .yamlio import safe_load
+
+logger = logging.getLogger(__name__)
 
 _LOCK = threading.RLock()
 ALLOWLIST_FILENAME = "bots.yaml"
@@ -167,6 +170,12 @@ def _after_copy(profile: Path, conn: kb_connection.Connection) -> None:
     profile_config.seed_provider(profile)
     profile_config.seed_skills_dir(profile, kb_connection.personal_skills_dir(conn))
     activate_plugin(profile)
+    if conn.memory_provider == "holographic":
+        from . import memory_provider
+
+        outcome = memory_provider.ensure(profile)
+        if outcome.get("error"):
+            logger.warning("requrv-kb: Holographic non attivo in %s: %s", profile.name, outcome["error"])
 
 
 def activate_plugin(profile: Path) -> None:

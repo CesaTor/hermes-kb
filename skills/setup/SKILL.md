@@ -23,9 +23,11 @@ Usa questa skill quando l'utente vuole collegare la KB, vedere i bot disponibili
    la propria o prendere la nuova (`/kb resolve --kind skill --name <nome> --choice keep|take`).
 7. Il plugin copia `MEMORY.md`, `USER.md` e, se Holographic è attivo, `memory_store.db` in
    `Operatori/<nome>/memoria/<bot>/`. È un backup di lavoro, non una pagina della wiki.
-8. Le chiavi gestite di `config.yaml` e le attività pianificate non si modificano: sono della libreria.
-9. Se sei il reparto IT (`ruolo: it` in `.autorizzazioni.yaml`): `/kb it list`, `/kb it show`,
-   `/kb it accept --yes`, `/kb it reject --reason`, `/kb updates --apply`.
+8. Se l'IT ha scelto Holographic per la memoria aziendale: `hermes kb memory enable --all`.
+   `hermes kb memory status` mostra lo stato.
+9. Le chiavi gestite di `config.yaml` e le attività pianificate non si modificano: sono della libreria.
+10. Se sei il reparto IT (`ruolo: it` in `.autorizzazioni.yaml`): `/kb it list`, `/kb it show`,
+    `/kb it accept --yes`, `/kb it reject --reason`, `/kb updates --apply`.
 
 Le nuove istruzioni valgono dalla prossima conversazione. I permessi delle cartelle li decide il
 cloud: il plugin non concede né toglie accessi.

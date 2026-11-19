@@ -10,7 +10,7 @@ operator's personal folder. Nothing here enforces access: the cloud account does
 from __future__ import annotations
 
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -31,6 +31,7 @@ class Connection:
     operator: str
     personal: str
     connected_at: str = ""
+    memory_provider: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {**asdict(self), "roots": list(self.roots)}
@@ -170,8 +171,10 @@ def connect(roots: list[str], operator: Optional[str] = None, personal: Optional
         raise KBError("Non riesco a capire qual è la tua cartella personale: indica l'operatore.")
     if not valid_operator(name):
         raise KBError("Il nome dell'operatore deve essere un nome di cartella valido.")
+    previous = load()
     return Connection(resolved_roots, name, str(personal_path),
-                      datetime.now(UTC).isoformat(timespec="seconds"))
+                      datetime.now(UTC).isoformat(timespec="seconds"),
+                      previous.memory_provider if previous else "")
 
 
 def save(connection: Connection) -> None:
@@ -187,7 +190,22 @@ def load() -> Optional[Connection]:
     if (not isinstance(roots, list) or not roots or not all(isinstance(r, str) for r in roots)
             or not isinstance(operator, str) or not valid_operator(operator) or not isinstance(personal, str)):
         return None
-    return Connection(tuple(roots), operator, personal, str(data.get("connected_at") or ""))
+    provider = data.get("memory_provider")
+    return Connection(tuple(roots), operator, personal, str(data.get("connected_at") or ""),
+                      provider if isinstance(provider, str) else "")
+
+
+def set_memory_provider(provider: str) -> Connection:
+    """Remember the company memory-provider choice for bots installed on this computer."""
+    conn = load()
+    if conn is None:
+        raise KBError("Questo computer non è ancora collegato alla KB.")
+    value = str(provider or "").strip()
+    if value not in {"", "holographic"}:
+        raise KBError("Provider di memoria non supportato: usa «holographic» o vuoto.")
+    updated = replace(conn, memory_provider=value)
+    save(updated)
+    return updated
 
 
 def disconnect() -> None:

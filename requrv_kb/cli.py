@@ -55,6 +55,9 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     reject.add_argument("--reason", default="", help="Perché la proposta non entra")
     updates = sub.add_parser("updates", help="Cosa offre la libreria e applicazione degli aggiornamenti")
     updates.add_argument("--apply", action="store_true", help="Installa e aggiorna adesso")
+    memory = sub.add_parser("memory", help="Memoria Holographic opzionale per i bot di libreria")
+    memory.add_argument("action", nargs="?", choices=["status", "enable", "disable"], default="status")
+    memory.add_argument("--all", action="store_true", help="Tutti i bot di libreria di questo computer")
     parser.set_defaults(kb_action="check")
 
 
@@ -116,6 +119,30 @@ def _updates(a) -> dict[str, Any]:
     return {"updates": offered, "results": library.reconcile()}
 
 
+def _memory(a) -> dict[str, Any]:
+    from . import memory_provider
+
+    conn = _require_connection()
+    action = a.action or "status"
+    if action == "status":
+        return {"provider": conn.memory_provider,
+                "bots": [memory_provider.status(p) for p in _library_profiles()]}
+    if not a.all:
+        raise KBError("Indica --all: la scelta Holographic vale per tutti i bot di libreria.")
+    if action == "enable":
+        conn = kb_connection.set_memory_provider(memory_provider.PROVIDER)
+        return {"provider": conn.memory_provider, "results": memory_provider.ensure_all()}
+    kb_connection.set_memory_provider("")
+    return {"provider": "", "results": memory_provider.disable_all()}
+
+
+def _library_profiles() -> list:
+    from . import ledger
+    from .paths import named_profiles
+
+    return [p for p in named_profiles() if ledger.read(p) is not None]
+
+
 _ACTIONS: dict[str, Callable[[Any], Any]] = {
     "connect": _connect,
     "disconnect": lambda a: (kb_connection.disconnect(), {"disconnected": True})[1],
@@ -131,6 +158,7 @@ _ACTIONS: dict[str, Callable[[Any], Any]] = {
     "resolve": _resolve,
     "it": _review,
     "updates": _updates,
+    "memory": _memory,
 }
 
 
@@ -168,6 +196,13 @@ def _text(action: str, result: dict[str, Any]) -> str:
         return _review_text(result)
     if action == "updates":
         return _updates_text(result)
+    if action == "memory":
+        if "bots" in result:
+            rows = [f"{b['profile']:<24} plugin {'sì' if b['plugin'] else 'no':<3} "
+                    f"provider {'sì' if b['configured'] else 'no'}" for b in result["bots"]]
+            return f"Provider aziendale: {result['provider'] or 'built-in'}\n" + "\n".join(rows)
+        rows = [f"{r['profile']:<24} {'ok' if not r.get('error') else r['error']}" for r in result["results"]]
+        return f"Provider aziendale: {result['provider'] or 'built-in'}\n" + "\n".join(rows)
     return "Fatto."
 
 

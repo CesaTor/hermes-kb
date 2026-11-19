@@ -147,13 +147,23 @@ clienti, credenziali o ipotesi. Le skill del Knowledge Manager descrivono i crit
 Il percorso è volutamente fuori dalla wiki: `memoria/` è una copia di lavoro, non una pagina. Il
 canale per la conoscenza condivisa resta `proposte/knowledge/` → revisione IT → wiki.
 
+Per abilitare Holographic su **tutti i bot di libreria** di questo computer, con una sola scelta
+aziendale:
+
+```sh
+hermes kb memory enable --all
+```
+
+Il comando salva la scelta nel collegamento, installa e abilita Holographic nei profili e imposta
+`memory.provider`; i bot installati in seguito la ereditano. `hermes kb memory status` mostra lo
+stato, `hermes kb memory disable --all` riporta tutti alla memoria built-in (il plugin resta
+installato).
+
 ### Memoria locale opzionale
 
 Holographic è un provider di memoria Hermes con archivio SQLite per profilo. È **opzionale** e non
 sostituisce la memoria built-in né la knowledge base condivisa: i fatti restano locali al profilo.
-Per provarlo su un profilo di test, installa **Holographic**, selezionalo come provider di memoria e
-prova `fact_store` scrivendo un fatto sintetico e cercandolo in una nuova sessione. Su un bot di
-libreria l’installazione è per profilo:
+La configurazione aziendale qui sopra è il percorso consigliato; in alternativa, per un solo bot:
 
 ```sh
 hermes -p marketing plugins install holographic --enable
