@@ -27,6 +27,7 @@ Guida completa all'installazione, aggiornamento e installazione guidata da Herme
 | Autorizzazioni per operatore: `.autorizzazioni.yaml` nella cartella personale restringe i bot installabili | `requrv_kb/authz.py` |
 | Cattura passiva di fatti e pratiche riutilizzabili durante le conversazioni con i bot di libreria | `requrv_kb/knowledge_capture.py`, tool `kb_capture_knowledge` |
 | Revisione IT: proposte e conoscenze di tutti gli operatori, differenze, accetta/rifiuta, aggiornamenti | `requrv_kb/it.py`, tool `kb_proposals`/`kb_updates`, skill `revisione-proposte` |
+| Memoria aziendale opzionale: Holographic installato e configurato per tutti i bot di libreria | `requrv_kb/memory_provider.py`, `hermes kb memory` |
 | Impostazioni → Plugin → **ReQurv KB**: collegamento, ultimo controllo, «Controlla ora» (nessuna pagina Libreria) | `desktop/plugin.js` + `dashboard/plugin_api.py` |
 | Tema ReQurv (colori e font Syne incorporati, licenza OFL in `desktop/OFL-syne.txt`), scelto una sola volta alla prima attivazione; «Tema ReQurv» in Impostazioni lo riapplica | `desktop/plugin.js` |
 | Layout `requrv-kb:minimal` e voci del menu laterale nascoste (Messaging, Artifacts, Scheduled jobs, Kanban) | `desktop/plugin.js` |
@@ -72,6 +73,7 @@ hermes kb status            # mostra anche le versioni personali delle skill da 
 hermes kb resolve --kind skill --name brand --choice keep
 hermes kb it list           # revisione IT
 hermes kb updates --apply
+hermes kb memory enable --all   # Holographic per tutti i bot (opzionale)
 ```
 
 I bot installati compaiono nella sezione **Bots**. Le modifiche valgono dalla conversazione successiva.
