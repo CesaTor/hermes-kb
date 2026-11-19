@@ -75,6 +75,8 @@ def _refusal(profile: Path, rel: str) -> Optional[str]:
     rel = _norm(rel)
     if rel in _METADATA:
         return "metadata"
+    if rel == "soul.md" and ledger.read(profile) is not None:
+        return "soul"
     if rel == "config.yaml" and (ledger.read(profile) or {}).get("config_managed"):
         return "config"
     return None
@@ -83,6 +85,9 @@ def _refusal(profile: Path, rel: str) -> Optional[str]:
 def _message(profile: Path, kind: str, name: str = "") -> str:
     record = ledger.read(profile) or {}
     bot = record.get("bot") or profile.name
+    if kind == "soul":
+        return (f"Il SOUL del bot «{bot}» è certificato e viene aggiornato dalla libreria. "
+                "Per un'identità personale, duplica il bot con «hermes kb duplicate» e modifica il clone.")
     if kind == "config":
         return (f"Le chiavi di config.yaml del bot «{bot}» sono gestite dalla libreria e vengono "
                 "riallineate a ogni aggiornamento: chiedi all'IT di cambiarle nel pacchetto.")

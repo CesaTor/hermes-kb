@@ -1,6 +1,6 @@
 ---
 name: revisione-proposte
-description: Rivedere le proposte degli operatori (SOUL, skill, conoscenze) e gestire gli aggiornamenti della KB.
+description: Rivedere le proposte degli operatori (skill, conoscenze, memoria) e gestire gli aggiornamenti della KB.
 ---
 
 # Revisione delle proposte — reparto IT
@@ -30,8 +30,8 @@ valutare una modifica a un bot o di allineare i bot della libreria. I tool `kb_p
   uno, resta la sua versione personale e la proposta si rifiuta spiegando perché.
 - **Nessun segreto**: chiavi, token, password, dati di clienti o informazioni personali non entrano
   nel pacchetto.
-- **Coerente con il SOUL certificato**: una proposta che contraddice l'identità del bot va riscritta,
-  non accettata così com'è.
+- **Coerente con il SOUL certificato**: il SOUL non si propone e non si modifica; per un'identità
+  personale l'operatore duplica il bot. Una proposta che contraddice il SOUL va rifiutata.
 - **Skill con script**: Python, senza percorsi assoluti, senza dipendenze fuori da quelle già
   dichiarate; apri `scripts/` prima di accettare.
 - **Nessuna cancellazione silenziosa**: se la proposta rimuove contenuto, chiedi il motivo e
@@ -42,8 +42,8 @@ valutare una modifica a un bot o di allineare i bot della libreria. I tool `kb_p
 - `accept` alza la patch (`1.4.0 → 1.4.1`) nel `distribution.yaml` del pacchetto. Se la modifica è
   sostanziale, proponi all'IT un salto di minor (`1.5.0`) e fallo a mano nel file.
 - Dopo l'accettazione i bot degli operatori ricevono la versione all'avvio o alla conversazione
-  successiva. Chi aveva una versione personale di quel file riceverà la domanda «tieni la tua o
-  prendi la nuova?».
+  successiva. Il `SOUL.md` viene sempre sostituito dal pacchetto. Chi aveva una versione personale
+  di una **skill** riceverà la domanda «tieni la tua o prendi la nuova?».
 - `kb_updates` con `action: list` dice cosa la libreria offre e questo computer non ha; `apply`
   installa e aggiorna qui. Non è la stessa cosa di accettare una proposta: quello cambia il
   pacchetto per tutti.
@@ -54,6 +54,24 @@ I file in `Operatori/<nome>/proposte/knowledge/` sono cose che gli operatori han
 azienda e flussi. Non si «approvano»: si integrano nella documentazione condivisa (documenti
 dell'area, con le regole di pubblicazione) e **poi** si cancellano dalla cartella. Se non servono,
 spostali in `proposte/Archivio/` con il motivo: la cancellazione resta il segnale di «integrata».
+
+## Memoria degli operatori
+
+Il plugin copia la memoria built-in di ogni bot in `Operatori/<nome>/memoria/<bot>/`:
+
+- `MEMORY.md` e `USER.md` (memoria built-in di Hermes);
+- `memory_store.db` se Holographic è attivo.
+
+Questa cartella è materiale di lavoro, non una pagina della wiki. Va letta come una bozza:
+
+- non pubblicare dati personali, di clienti, credenziali, segreti o informazioni riservate;
+- promuovi solo fatti lavorativi durevoli, generali e verificabili;
+- se un fatto è utile a tutti, trasformalo in una proposta `knowledge/` con la fonte e seguì il
+  normale ciclo di revisione;
+- se il contenuto è ambiguo, chiedi all'operatore. La responsabilità dell'approvazione è dell'IT.
+
+Non copiare la memoria nella wiki così com'è e non usare Holographic come knowledge base condivisa:
+il suo database è locale al profilo.
 
 ## Nel dubbio
 

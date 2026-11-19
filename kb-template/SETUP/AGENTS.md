@@ -88,13 +88,22 @@ conversazione con un bot: aggiorna i bot e reinstalla quelli cancellati; **non r
 (uno non più abilitato resta, e viene segnalato come `not-allowed`). Non c'è un controllo periodico:
 «Controlla ora» in Impostazioni e `hermes kb reconcile` lo fanno su richiesta.
 
-Se l'operatore ha personalizzato il SOUL o una skill e la libreria pubblica una versione che tocca
-quel file, la versione personale resta live; il bot al primo uso spiega la differenza e chiede se
-tenere la versione dell'operatore o prendere la nuova. Lo chiede anche se la divergenza esiste già
-senza un update (per esempio un SOUL modificato con un editor). La risposta si registra con il tool
-`kb_personal` oppure con `hermes -p <bot> kb resolve --kind soul|skill --choice keep|take`;
-«tengo la mia» lascia la copia personale, «prendo la nuova» applica la versione conservata e la
-rimuove dalle proposte.
+Il **SOUL** del bot è certificato e viene sostituito a ogni aggiornamento: non va modificato. Se
+l'operatore vuole un'identità propria, duplicalo con `hermes kb duplicate <bot> <nome>` e lavora sul
+clone personale.
+
+Le **skill** invece si possono personalizzare. Se la libreria pubblica una versione che tocca una
+skill modificata, la versione personale resta live; il bot al primo uso spiega la differenza e
+chiede se tenere la versione dell'operatore o prendere la nuova. Lo chiede anche se la divergenza
+esiste già senza un update (per esempio una skill modificata con un editor). La risposta si registra
+con il tool `kb_personal` oppure con
+`hermes -p <bot> kb resolve --kind skill --name <nome> --choice keep|take`; «tengo la mia» lascia la
+copia personale, «prendo la nuova» applica la versione conservata e la rimuove dalle proposte.
+
+Il plugin copia inoltre `MEMORY.md`, `USER.md` e, se Holographic è attivo, `memory_store.db` in
+`Operatori/<nome>/memoria/<bot>/`. È un backup di lavoro, non una pagina della wiki: l'IT lo legge
+secondo i permessi del cloud e decide se promuovere qualche fatto nella conoscenza condivisa.
+Holographic è opzionale, resta locale al profilo e non va usato come knowledge base aziendale.
 
 Se nella cartella personale c'è un `.autorizzazioni.yaml`, quello restringe i bot installabili:
 se manca valgono i `bots.yaml` delle aree. Non crearlo: lo fornisce l'IT.

@@ -162,8 +162,9 @@ separatamente, anteponi `HERMES_HOME="$H_OP"` per Mario o `HERMES_HOME="$H_IT"` 
 | Registro del bot | `<HERMES_HOME>/profiles/<bot>/.library-owned.json` |
 | Versioni personali | `<HERMES_HOME>/profiles/<bot>/.requrv-kb-personal.json` |
 | Backup pre-aggiornamento | `<HERMES_HOME>/profiles/<bot>/.library-backup/<versione>/` |
-| Proposte SOUL/skill | `Operatori/<nome>/proposte/<bot>/` |
+| Proposte skill | `Operatori/<nome>/proposte/<bot>/` |
 | Conoscenze raccolte | `Operatori/<nome>/proposte/knowledge/` |
+| Backup memoria | `Operatori/<nome>/memoria/<bot>/` |
 | Indice dedup locale | `<HERMES_HOME>/plugin-data/requrv-kb/knowledge-dedup-*.json` |
 | Lock cattura | `<HERMES_HOME>/plugin-data/requrv-kb/knowledge-capture.lock` |
 | Watchdog | `<HERMES_HOME>/plugin-data/requrv-kb/watchdog/` |
@@ -334,8 +335,8 @@ Apri una nuova chat con `marketing` e chiedi, in tre messaggi separati:
    `1.0.0`.
 2. *“Che cosa dice il piano marketing 2026 sul budget?”* → deve leggere
    `01-Marketing/documenti/piano-marketing-2026.md` e citarlo.
-3. *“Cosa puoi modificare del tuo profilo e cosa no?”* → SOUL e skill sì; chiavi gestite di
-   `config.yaml`, metadati e attività pianificate no.
+3. *“Cosa puoi modificare del tuo profilo e cosa no?”* → il SOUL è certificato e non si modifica;
+   le skill sì; chiavi gestite di `config.yaml`, metadati e attività pianificate no.
 
 **Atteso:** risposte coerenti, citazioni alla KB, nessuna invenzione di percorsi. Le modifiche valgono
 dalla conversazione successiva.
@@ -381,18 +382,19 @@ aggiornamenti. Se il rollback perde una chat, è un bug: fermati.
 
 ### D. Versioni personali, proposte e blocchi
 
-#### D1 — Modifica SOUL e skill
+#### D1 — SOUL certificato e skill personale
 
-Nella chat con `marketing`, chiedi esplicitamente di usare il tool di scrittura:
+Nella chat con `marketing` prova prima il SOUL:
 
-*“Usa `write_file` per aggiungere al tuo `SOUL.md` la regola: ‘Dai sempre del lei’. Poi dimmi il
-percorso.”*
+*“Usa `write_file` per aggiungere al tuo `SOUL.md` la regola: ‘Dai sempre del lei’.”*
 
-Poi ripeti per `skills/brand/SKILL.md` con una frase distintiva.
+Deve rifiutare e rimandare al clone personale. Poi ripeti per `skills/brand/SKILL.md` con una
+frase distintiva.
 
-**Atteso:** il file live cambia; in `$KB/Operatori/mario/proposte/marketing/` compaiono `SOUL.md`,
-`skills/brand/SKILL.md` e `proposal.yaml` con `base_version` pari alla versione del pacchetto da cui
-parte la copia (1.0.0, 1.0.1 o quella corrente) e l'hash dei file. La modifica non tocca la libreria.
+**Atteso:** il SOUL resta invariato; la skill live cambia; in
+`$KB/Operatori/mario/proposte/marketing/` compaiono `skills/brand/SKILL.md` e `proposal.yaml` con
+`base_version` pari alla versione del pacchetto da cui parte la copia (1.0.0, 1.0.1 o quella
+corrente) e l'hash del file. La modifica non tocca la libreria.
 
 #### D2 — Blocchi su config, metadati e cron
 
@@ -405,30 +407,31 @@ parte la copia (1.0.0, 1.0.1 o quella corrente) e l'hash dei file. La modifica n
 **Nota:** una modifica fatta con un editor o un comando di terminale bypassa il blocco; è un limite
 noto. Il test vale solo per i tool dell'agente.
 
-#### D3 — Aggiornamento che non tocca il file personale
+#### D3 — Aggiornamento che non tocca la skill personale
 
 1. Porta `distribution.yaml` della libreria a una versione successiva (es. `2.0.0`) **senza**
-   cambiare `SOUL.md`.
+   cambiare `skills/brand/SKILL.md`.
 2. `HERMES_HOME="$H_OP" hermes kb update marketing`.
 
-**Atteso:** `reapplied: ["SOUL"]`, nessun pending, il SOUL personale resta live.
+**Atteso:** `reapplied: ["brand"]`, nessun pending, la skill personale resta live.
 
-#### D4 — Conflitto: tieni la tua versione
+#### D4 — Conflitto su una skill: tieni la tua versione
 
-1. Porta la libreria a una versione ancora successiva (es. `3.0.0`) cambiando anche `SOUL.md`.
+1. Porta la libreria a una versione ancora successiva (es. `3.0.0`) cambiando anche
+   `skills/brand/SKILL.md`.
 2. `HERMES_HOME="$H_OP" hermes kb update marketing`.
-3. `HERMES_HOME="$H_OP" hermes kb status` → `(1 versioni tue da decidere)`; il SOUL live resta
-   quello personale, la nuova versione è conservata per la scelta.
+3. `HERMES_HOME="$H_OP" hermes kb status` → `(1 versioni tue da decidere)`; la skill live resta
+   quella personale, la nuova versione è conservata per la scelta.
 4. Apri una nuova chat: il bot deve spiegare la differenza e chiedere.
 5. Rispondi “tieni la mia” oppure esegui:
 
    ```sh
-   HERMES_HOME="$H_OP" hermes -p marketing kb resolve --kind soul --choice keep
+   HERMES_HOME="$H_OP" hermes -p marketing kb resolve --kind skill --name brand --choice keep
    ```
 
-**Atteso:** il SOUL personale torna live; la proposta resta per l'IT; il pending sparisce.
+**Atteso:** la skill personale resta live; la proposta resta per l'IT; il pending sparisce.
 
-#### D5 — Conflitto: prendi la nuova versione
+#### D5 — Conflitto su una skill: prendi la nuova versione
 
 Porta la libreria a una versione ancora successiva (es. `4.0.0`) cambiando
 `skills/brand/SKILL.md`, esegui `HERMES_HOME="$H_OP" hermes kb update marketing`, poi apri una chat e
@@ -441,6 +444,12 @@ HERMES_HOME="$H_OP" hermes -p marketing kb resolve --kind skill --name brand --c
 **Atteso:** la versione della libreria resta live; la copia in `proposte/marketing/skills/brand/`
 viene rimossa (è il segnale di “integrata”); il pending sparisce. La domanda non deve ripresentarsi
 alla release successiva.
+
+#### D6 — Un SOUL personale è un clone
+
+Con `marketing`, chiedi di cambiare il SOUL: deve rifiutare. Poi esegui
+`hermes kb duplicate marketing marketing-personale` e verifica che il clone abbia il SOUL copiato e
+non riceva aggiornamenti dalla libreria.
 
 ---
 
@@ -804,6 +813,28 @@ Non esiste un controllo periodico. Verifica i tre trigger reali:
 **Atteso:** nessun aggiornamento “a orologio”; i trigger sono avvio, nuova conversazione e richiesta
 manuale.
 
+#### H6 — Backup di MEMORY.md, USER.md e Holographic
+
+1. Con `marketing`, chiedi al bot di ricordare un fatto sintetico, per esempio:
+   *“Ricorda che il colore di prova dell’area è il blu.”*
+2. Verifica:
+
+   ```sh
+   ls "$KB/Operatori/mario/memoria/marketing"
+   ```
+
+**Atteso:** `MEMORY.md` e/o `USER.md` compaiono nella cartella, con il fatto salvato. Se Holographic è
+attivo, compare anche `memory_store.db`.
+
+3. Chiedi di nuovo lo stesso fatto o non modificare nulla, poi controlla che i file non vengano
+   riscritti inutilmente (il backup è change-only).
+4. Apri il backup: deve essere materiale di lavoro leggibile, **non** una pagina della wiki.
+5. Con l’IT, verifica che la skill `revisione-proposte` e `knowledge-ingest` trattino `memoria/` come
+   bozza e non come conoscenza già approvata.
+
+**Attenzione:** non usare dati personali veri. Il backup finisce in una cartella sincronizzata e
+l’IT è responsabile di ciò che approva.
+
 ---
 
 ### I. Hermes Desktop
@@ -894,7 +925,8 @@ su macOS.
 
 1. Installa `marketing` e apri una chat.
 2. Verifica le cartelle nel prompt, la versione e la citazione di un documento.
-3. Chiedi una modifica al SOUL e verifica la proposta in `Operatori\<nome>\proposte\marketing\`.
+3. Chiedi una modifica al SOUL: deve rifiutare e rimandare al clone personale. Chiedi una modifica a
+   una skill e verifica la proposta in `Operatori\<nome>\proposte\marketing\`.
 4. Chiedi di modificare `config.yaml` e verifica il rifiuto.
 
 #### K3 — Cattura, dedup e lock
@@ -1045,9 +1077,8 @@ hermes kb rollback marketing
 hermes kb duplicate marketing marketing-personale
 hermes kb reconcile
 
-# Versioni personali (nel profilo del bot)
-hermes -p marketing kb resolve --kind soul --choice keep
-hermes -p marketing kb resolve --kind skill --name brand --choice take
+# Versioni personali delle skill (nel profilo del bot)
+hermes -p marketing kb resolve --kind skill --name brand --choice keep
 
 # IT
 hermes kb it list

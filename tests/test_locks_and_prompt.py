@@ -27,7 +27,8 @@ def test_only_managed_config_and_package_metadata_are_locked(connected):
         ["write_file", {"path": str(bot / "notes.md"), "content": "x"}],
         ["read_file", {"path": str(bot / "SOUL.md")}],
     ])
-    assert [r and r["action"] for r in results] == [None] * 4 + ["block"] + [None] * 3
+    assert [r and r["action"] for r in results] == ["block"] + [None] * 3 + ["block"] + [None] * 3
+    assert "SOUL" in results[0]["message"] and "duplica" in results[0]["message"]
     assert "config.yaml" in results[4]["message"] and "marketing" in results[4]["message"]
 
 
@@ -56,7 +57,8 @@ def test_prompt_section_names_the_connected_folders_and_what_may_be_edited(conne
     text = connected.python("from requrv_kb.prompt import section; print(section({}))", connected.profile("marketing"))
     assert str(kb["library"]) in text and str(kb["personal"]) in text
     assert f"($SECOND_BRAIN_ROOT nelle skill) è {kb['library'].parent}." in text
-    assert "«marketing»" in text and "puoi modificarli su richiesta" in text
+    assert "«marketing»" in text and "SOUL.md è certificato" in text
+    assert "skill certificate si possono modificare" in text
     assert str(kb["personal"] / "proposte" / "marketing") in text
     plain = connected.python("from requrv_kb.prompt import section; print(section({}))", connected.root)
     assert "bot di libreria" not in plain

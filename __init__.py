@@ -18,8 +18,8 @@ _KB_PERSONAL_SCHEMA = {
     "properties": {
         "action": {"type": "string", "enum": ["list", "decide"],
                    "description": "list the operator's own versions waiting for a decision, or decide one"},
-        "kind": {"type": "string", "enum": ["soul", "skill"]},
-        "name": {"type": "string", "description": "skill name, when kind is skill"},
+        "kind": {"type": "string", "enum": ["skill"]},
+        "name": {"type": "string", "description": "skill name"},
         "choice": {"type": "string", "enum": ["keep", "take"],
                    "description": "keep = the operator's version, take = the library's new one"},
     },
@@ -138,7 +138,7 @@ def _kb_updates(args: dict[str, Any], **_: Any) -> str:
 
 
 def _kb_personal(args: dict[str, Any], **_: Any) -> str:
-    """The operator's own SOUL/skill versions a new release collided with."""
+    """The operator's own skill versions a new release collided with."""
     from .requrv_kb import personal
     from .requrv_kb.paths import KBError, active_profile
 
@@ -150,10 +150,11 @@ def _kb_personal(args: dict[str, Any], **_: Any) -> str:
             raise KBError("Azione sconosciuta: usa «list» o «decide».")
         conn = _connection_or_error()
         kind = str(args.get("kind") or "").strip().lower()
-        if kind not in {"soul", "skill"}:
-            raise KBError("Indica kind «soul» o «skill».")
+        if kind != "skill":
+            raise KBError("Il SOUL è certificato: per un'identità personale duplica il bot. "
+                          "La scelta keep/take riguarda solo le skill.")
         name = str(args.get("name") or "").strip()
-        if kind == "skill" and not name:
+        if not name:
             raise KBError("Indica il nome della skill.")
         decided = personal.decide(active_profile(), conn, kind, name, str(args.get("choice") or ""))
         return json.dumps({"decided": decided}, ensure_ascii=False)
@@ -191,6 +192,8 @@ def register(ctx):
     ctx.register_hook("post_tool_call", mirror.on_tool_call)
     ctx.register_hook("on_skill_lifecycle", mirror.on_skill_lifecycle)
     ctx.register_hook("on_session_start", autosync.on_session_start)
+    ctx.register_hook("on_session_start", mirror.on_session_start)
+    ctx.register_hook("on_session_end", mirror.on_session_end)
     ctx.register_hook("pre_llm_call", prompt.pre_llm_call)
     ctx.register_tool(name="kb_personal", toolset="kb", schema=_KB_PERSONAL_SCHEMA,
                       handler=_kb_personal, emoji="🔁",
@@ -198,7 +201,7 @@ def register(ctx):
                                    "decisione e registra la risposta dell'operatore (keep/take)."))
     ctx.register_tool(name="kb_proposals", toolset="kb", schema=_KB_PROPOSALS_SCHEMA,
                       handler=_kb_proposals, emoji="📝", check_fn=_it_available,
-                      description=("Revisione IT: elenca le proposte degli operatori (SOUL, skill, knowledge), "
+                      description=("Revisione IT: elenca le proposte degli operatori (skill, knowledge), "
                                    "mostra le differenze con il pacchetto e accetta o rifiuta una modifica."))
     ctx.register_tool(name="kb_updates", toolset="kb", schema=_KB_UPDATES_SCHEMA,
                       handler=_kb_updates, emoji="🔄", check_fn=_it_available,

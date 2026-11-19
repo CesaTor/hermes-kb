@@ -37,8 +37,8 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     dup.add_argument("bot")
     dup.add_argument("name", help="Nome della copia")
     resolve = sub.add_parser("resolve", help="Tieni la tua versione o prendi quella nuova della libreria")
-    resolve.add_argument("--kind", choices=["soul", "skill"], required=True)
-    resolve.add_argument("--name", default="", help="Nome della skill (con --kind skill)")
+    resolve.add_argument("--kind", choices=["skill"], required=True)
+    resolve.add_argument("--name", default="", help="Nome della skill")
     resolve.add_argument("--choice", choices=["keep", "take"], required=True,
                          help="keep = tengo la mia, take = prendo la nuova")
     review = sub.add_parser("it", help="Revisione IT: proposte degli operatori e aggiornamenti")
@@ -160,7 +160,7 @@ def _text(action: str, result: dict[str, Any]) -> str:
     if action == "duplicate":
         return f"Creato il bot personale «{result['profile']}»."
     if action == "resolve":
-        what = f"la skill «{result['name']}»" if result["kind"] == "skill" else "il SOUL"
+        what = f"la skill «{result['name']}»"
         if result["choice"] == "keep":
             return f"Tengo la tua versione di {what}. Vale dalla prossima conversazione."
         return f"Prendo la nuova versione di {what}; la tua copia è stata rimossa dalle proposte."

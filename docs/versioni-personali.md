@@ -1,4 +1,4 @@
-# Versioni personali, proposte e reparto IT
+# Versioni personali delle skill, memoria e reparto IT
 
 Data: 18 novembre 2026. Implementato in questa repository, verificato contro Hermes **upstream**
 (`upstream/main`, non il fork ReAgent).
@@ -8,13 +8,16 @@ Data: 18 novembre 2026. Implementato in questa repository, verificato contro Her
 | Tema | Scelta |
 |---|---|
 | Prodotto | Hermes-first: il plugin è il prodotto, nessun server; la KB sincronizzata è il canale |
-| SOUL e skill di libreria | Modificabili dall'operatore, live nel profilo, copiati in `proposte/` |
+| SOUL di libreria | Certificato e sovrascritto a ogni update; per un'identità propria si duplica il bot |
+| Skill di libreria | Modificabili dall'operatore, live nel profilo, copiate in `proposte/` |
 | `config.yaml` gestito, metadati, cron | Restano rifiutati: la libreria li riallinea |
 | Skill nuove | Nascono in `Operatori/<nome>/skills` via `skills.create_dir` |
-| Conflitto su update | Si chiede in chat; «tengo la mia» = la copia personale resta com'è |
+| Conflitto su una skill | Si chiede in chat; «tengo la mia» = la copia personale resta com'è |
 | Rimozione automatica dei bot | Eliminata: un bot non più abilitato resta, marcato `not-allowed` |
 | Proposte chiuse | Accettata = cancellata dal pacchetto; rifiutata = in `proposte/Archivio/` con motivo |
-| Knowledge | Solo l'autore la legge; cattura automatica a fine turno (non ancora implementata) |
+| Knowledge | Solo l'autore la legge; cattura passiva con proposta Markdown |
+| Memoria built-in | `MEMORY.md`/`USER.md` per profilo; backup in `Operatori/<nome>/memoria/<bot>/` |
+| Holographic | Opzionale, SQLite per profilo; il DB entra nello stesso backup, non nella wiki |
 | Autorizzazioni | `.autorizzazioni.yaml` nascosto nella cartella personale, scritto dall'IT |
 | Due macchine | Ci si affida al sync; copie in conflitto fermano il bot |
 
@@ -23,7 +26,7 @@ Data: 18 novembre 2026. Implementato in questa repository, verificato contro Her
 Nel profilo (locale, mai sincronizzato):
 
 - `.library-owned.json` — cosa possiede la libreria (già esistente);
-- `.requrv-kb-personal.json` — per SOUL e ogni skill: `base_hash` (certificato all'ultimo sync),
+- `.requrv-kb-personal.json` — per ogni skill: `base_hash` (certificato all'ultimo sync),
   `live_hash`, `personal_hash`, `base_version`, `pending`;
 - `.requrv-kb-incoming/<versione>/` — la nuova versione certificata messa da parte durante un
   conflitto, pronta per «prendo la nuova».
@@ -34,23 +37,28 @@ Nella cartella personale (condivisa):
 Operatori/<nome>/
 ├─ .autorizzazioni.yaml
 ├─ skills/                          # create_dir
+├─ memoria/<bot>/                   # MEMORY.md, USER.md, memory_store.db (Holographic)
 └─ proposte/
-   ├─ knowledge/                    # un .md per conoscenza (cattura automatica, fase 2)
+   ├─ knowledge/                    # un .md per conoscenza (cattura passiva)
    └─ <bot>/
       ├─ proposal.yaml              # bot, operatore, base_version, aggiornato_il, hash dei file
-      ├─ SOUL.md                    # copia intera
       └─ skills/<nome>/             # cartella intera (SKILL.md + scripts/ + asset)
 ```
 
 ## Flussi
 
-**Scrittura.** `pre_tool_call` lascia passare SOUL e skill; `post_tool_call` (SOUL) e
-`on_skill_lifecycle` (skill) copiano il file in `proposte/<bot>/` e aggiornano gli hash. La modifica
-è già live: il bot la usa dalla conversazione successiva.
+**Scrittura.** `pre_tool_call` blocca il `SOUL.md` dei bot di libreria e rimanda al clone personale.
+Lascia passare le skill; `on_skill_lifecycle` copia la skill in `proposte/<bot>/` e aggiorna gli
+hash. La modifica è già live: il bot la usa dalla conversazione successiva.
+
+**Memoria.** `post_tool_call` sul tool `memory`, più `on_session_start`/`on_session_end`, copiano
+`memories/MEMORY.md`, `memories/USER.md` e, se presente, `memory_store.db` di Holographic in
+`Operatori/<nome>/memoria/<bot>/`. La copia è solo se il contenuto è cambiato. Non è pubblicazione:
+l'IT la legge secondo le ACL e decide se promuovere qualcosa nella wiki.
 
 **Update.** Il controllo della libreria parte all'avvio di Hermes e a ogni nuova conversazione con
-un bot; non c'è un timer periodico. `personal.plan` legge gli hash prima che Hermes scriva. Poi, per
-ogni file:
+un bot; non c'è un timer periodico. `SOUL.md` viene sempre aggiornato dal pacchetto. `personal.plan`
+legge gli hash delle skill prima che Hermes scriva. Poi, per ogni skill:
 
 | Stato | Cosa succede |
 |---|---|
@@ -61,8 +69,8 @@ ogni file:
 La sezione di prompt `requrv-kb.personal` porta al bot il diff (`-` la tua, `+` la nuova) e le
 istruzioni per chiedere. La risposta passa dal tool `kb_personal` o da `hermes kb resolve`.
 
-**Decisione.** `keep` mantiene la personale live; `take` applica la nuova versione conservata e
-cancella la copia da `proposte/`. In entrambi i casi `base_version` diventa la nuova, quindi la
+**Decisione.** `keep` mantiene la skill personale live; `take` applica la nuova versione conservata
+e cancella la copia da `proposte/`. In entrambi i casi `base_version` diventa la nuova, quindi la
 domanda non si ripete finché la libreria non cambia di nuovo.
 
 ## Autorizzazioni
@@ -106,7 +114,7 @@ pacchetto: l'IT può decidere, ma lo sa.
 
 ## Verifica
 
-Tutti i test (45) girano contro Hermes upstream in un worktree separato:
+Tutti i test (95) girano contro Hermes upstream in un worktree separato:
 
 ```sh
 cd <checkout upstream> && PYTHONPATH=$PWD python3 -m pytest <plugin>/tests -q

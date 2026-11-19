@@ -3,7 +3,7 @@
 A library bot is replaced by every update, so what the operator changed is kept aside: the same
 file lives under ``Operatori/<nome>/proposte/<bot>/`` (see :mod:`mirror`) and the IT reads it from
 the shared folder. This module holds only the bookkeeping, local to the profile and never synced:
-the certified hash of ``SOUL.md`` and of every shipped skill at the last sync (``base_hash``), what
+the certified hash of every shipped skill at the last sync (``base_hash``), what
 is live now (``live_hash``), and the operator's own copy when one exists (``personal_hash``).
 
 From those three an update decides:
@@ -17,6 +17,9 @@ From those three an update decides:
 The question is answered in chat through the ``kb_personal`` tool or ``hermes kb resolve``; "keep"
 keeps the personal copy live, "take" applies the staged certified version and discards the copy in
 the proposals folder (because deleting there is what tells the IT a change was integrated).
+
+``SOUL.md`` is deliberately outside this module: a library bot's identity is certified and is
+replaced by every update. A different identity is a personal clone, not a conflict.
 """
 
 from __future__ import annotations
@@ -113,9 +116,9 @@ def certified(pkg: package.Package) -> dict[str, Any]:
 # --- the record ---------------------------------------------------------------------------------
 
 def _entry(base: Optional[str], live: Optional[str]) -> dict[str, Any]:
-    # A profile installed before this feature may already hold a personal SOUL/skill: if the live
+    # A profile installed before this feature may already hold a personal skill: if the live
     # content differs from the package it received, adopt it now instead of losing it on the first
-    # update.
+    # update. SOUL is certified and never adopted.
     personal = live if live is not None and live != base else None
     return {"base_hash": base, "live_hash": live, "personal_hash": personal}
 
@@ -136,17 +139,18 @@ def record_install(profile: Path, pkg: package.Package) -> dict[str, Any]:
 
 
 def ensure(profile: Path, pkg: package.Package) -> dict[str, Any]:
-    """A record for a bot installed before this feature: its current files become the base.
+    """A record for a bot installed before this feature: its current skill files become the base.
 
-    A file already changed by the operator is adopted as personal and marked for the first conflict,
-    so the first update asks instead of silently replacing it. From then on every change is tracked.
+    A skill already changed by the operator is adopted as personal and marked for the first conflict,
+    so the first update asks instead of silently replacing it. SOUL is certified and not adopted.
     """
     record = read(profile)
     if record:
         return record
     record = record_install(profile, pkg)
     changed = False
-    entries = [record.get("soul") or {}, *(record.get("skills") or {}).values()]
+    record.setdefault("soul", {})["personal_hash"] = None
+    entries = list((record.get("skills") or {}).values())
     for entry in entries:
         if entry.get("personal_hash") and entry.get("base_hash") != entry.get("live_hash"):
             entry["base_hash"] = entry.get("live_hash")
@@ -157,7 +161,7 @@ def ensure(profile: Path, pkg: package.Package) -> dict[str, Any]:
 
 
 def note_personal(profile: Path, kind: str, name: str = "") -> None:
-    """Record that the live SOUL/skill is now the operator's own version."""
+    """Record that the live skill is now the operator's own version."""
     record = read(profile)
     if not record:
         return
@@ -172,7 +176,7 @@ def note_personal(profile: Path, kind: str, name: str = "") -> None:
 
 
 def pending(profile: Path) -> list[dict[str, Any]]:
-    return [p for p in read(profile).get("pending", []) if isinstance(p, dict) and p.get("kind") in {"soul", "skill"}]
+    return [p for p in read(profile).get("pending", []) if isinstance(p, dict) and p.get("kind") == "skill"]
 
 
 def pending_count(profile: Path) -> int:
@@ -204,7 +208,7 @@ def _state(entry: Optional[dict[str, Any]], incoming: Optional[str], unanswered:
 
 
 def _refresh_live(profile: Path, record: dict[str, Any]) -> bool:
-    """Re-read the live SOUL/skills and adopt a manual edit that the write hook did not observe."""
+    """Re-read the live skills and adopt a manual edit that the write hook did not observe."""
     changed = False
 
     def one(kind: str, name: str, entry: dict[str, Any]) -> None:
@@ -221,7 +225,6 @@ def _refresh_live(profile: Path, record: dict[str, Any]) -> bool:
             entry["personal_hash"] = personal
             changed = True
 
-    one("soul", "", record.setdefault("soul", {}))
     for name, entry in (record.get("skills") or {}).items():
         if isinstance(entry, dict):
             one("skill", name, entry)
@@ -243,7 +246,7 @@ def plan(profile: Path, pkg: package.Package, conn: Any = None) -> dict[str, Any
     return {
         "bot": record.get("bot") or pkg.name,
         "from_version": record.get("base_version"),
-        "soul": _state(record.get("soul"), incoming["soul"], _key("soul", "") in waiting),
+        "soul": "clean",
         "skills": {name: _state(entry, incoming["skills"].get(name), _key("skill", name) in waiting)
                    for name, entry in record.get("skills", {}).items()
                    if name in incoming["skills"]},
@@ -313,12 +316,12 @@ def _clear_incoming(profile: Path, item: dict[str, Any]) -> None:
 
 
 def ensure_pending(profile: Path, pkg: package.Package, conn: Any) -> list[dict[str, Any]]:
-    """Surface a personal/certified divergence that no update has recorded yet.
+    """Surface a personal/certified skill divergence that no update has recorded yet.
 
-    A SOUL edited with an editor, or a profile restored from a backup, can diverge while the package
+    A skill edited with an editor, or a profile restored from a backup, can diverge while the package
     version is unchanged. At prompt time we stage the certified file and add the pending question,
     so the operator always gets the keep/take choice before the next change. A decision already made
-    for the current certified base is not asked again.
+    for the current certified base is not asked again. SOUL is certified and never asked about.
     """
     record = ensure(profile, pkg)
     if _refresh_live(profile, record):
@@ -328,7 +331,7 @@ def ensure_pending(profile: Path, pkg: package.Package, conn: Any) -> list[dict[
     mirror.adopt_existing(profile, conn, str(record.get("bot") or pkg.name))
     pending_items = [p for p in record.get("pending", []) if isinstance(p, dict)]
     changed = False
-    for kind, name in [("soul", ""), *[("skill", str(n)) for n in (record.get("skills") or {})]]:
+    for kind, name in [("skill", str(n)) for n in (record.get("skills") or {})]:
         entry = _find(record, kind, name)
         if not entry or not entry.get("personal_hash"):
             continue
@@ -408,15 +411,14 @@ def apply_after_update(profile: Path, pkg: package.Package, planned: dict[str, A
         elif state == "reapply":
             entry["decided_base"] = new_hash
 
-    settle("soul", "", planned.get("soul") or "clean")
+    settle("soul", "", "clean")
     for name, state in (planned.get("skills") or {}).items():
         settle("skill", name, state)
 
     record["pending"] = list(pending.values())
     record["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     write(profile, record)
-    reapplied = (["SOUL"] if planned.get("soul") == "reapply" else []) + [
-        name for name, state in (planned.get("skills") or {}).items() if state == "reapply"]
+    reapplied = [name for name, state in (planned.get("skills") or {}).items() if state == "reapply"]
     return {"bot": bot, "version": pkg.version, "reapplied": reapplied,
             "pending": [{"kind": p["kind"], "name": p["name"]} for p in record["pending"]]}
 
@@ -430,6 +432,9 @@ def decide(profile: Path, conn: Any, kind: str, name: str, choice: str) -> dict[
     choice = str(choice or "").strip().lower()
     if choice not in {KEEP, TAKE}:
         raise KBError("La scelta è «keep» (tengo la mia) o «take» (prendo la nuova).")
+    if kind != "skill":
+        raise KBError("Il SOUL è certificato e viene aggiornato dalla libreria: per un'identità "
+                      "personale duplica il bot con «hermes kb duplicate».")
     record = read(profile)
     if not record:
         raise KBError("Questo bot non è un bot di libreria.")

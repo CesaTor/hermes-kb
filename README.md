@@ -17,7 +17,7 @@ Guida completa all'installazione, aggiornamento e installazione guidata da Herme
 | Installazione, aggiornamento, rollback, duplica come bot personale | `requrv_kb/library.py` sopra `hermes profile install/update/create` |
 | `config_managed`: chiavi di `config.yaml` che la libreria tiene allineate | `requrv_kb/profile_config.py` |
 | Backup prima di ogni aggiornamento (ultime 2 versioni) e rollback | `requrv_kb/ledger.py`, `library.py` |
-| SOUL e skill del bot modificabili dall'operatore: restano live e vengono copiati in `proposte/` | `requrv_kb/locks.py`, `mirror.py` |
+| SOUL certificato e aggiornato dalla libreria; skill del bot modificabili dall'operatore, copiate in `proposte/` | `requrv_kb/locks.py`, `mirror.py` |
 | Chiavi gestite di `config.yaml`, metadati del pacchetto e cron: restano bloccati | `requrv_kb/locks.py` (hook `pre_tool_call`) |
 | Versioni personali: a ogni release che tocca un file modificato si chiede in chat «tieni la tua o prendi la nuova» | `requrv_kb/personal.py`, `prompt.py`, tool `kb_personal` |
 | Provider del coordinatore copiato nel bot (modello, endpoint `providers.<nome>`, chiave) | `requrv_kb/profile_config.py` |
@@ -68,29 +68,34 @@ Collega la KB da Impostazioni → Plugin → **ReQurv KB**, oppure:
 hermes kb connect --root "/percorso/Biblioteca-Agenti" --root "/percorso/01-Marketing" --personal "/percorso/mario"
 hermes kb list
 hermes kb install marketing
-hermes kb status            # mostra anche le versioni personali da decidere
-hermes kb resolve --kind soul --choice keep
+hermes kb status            # mostra anche le versioni personali delle skill da decidere
+hermes kb resolve --kind skill --name brand --choice keep
 hermes kb it list           # revisione IT
 hermes kb updates --apply
 ```
 
 I bot installati compaiono nella sezione **Bots**. Le modifiche valgono dalla conversazione successiva.
 
-## Versioni personali e revisione IT
+## Versioni personali delle skill e revisione IT
 
-Il SOUL e le skill di un bot di libreria si possono modificare: la modifica vale da subito per
-quell'operatore e il plugin la copia in `Operatori/<nome>/proposte/<bot>/` (con `proposal.yaml`, la
-versione del pacchetto da cui parte). Chiavi gestite di `config.yaml`, metadati e cron restano invece
-rifiutati, perché la libreria li riallinea.
+Il **SOUL** di un bot di libreria è certificato: la libreria lo sostituisce a ogni aggiornamento e
+l’agente non può modificarlo. Chi vuole un’identità propria duplica il bot con
+`hermes kb duplicate <bot> <nome-personale>` e modifica il clone, che non riceve più aggiornamenti
+dalla libreria.
 
-Quando la libreria pubblica una versione che tocca un file modificato:
+Le **skill** invece si possono modificare: la modifica vale da subito per quell'operatore e il plugin
+la copia in `Operatori/<nome>/proposte/<bot>/` (con `proposal.yaml`, la versione del pacchetto da cui
+parte). Chiavi gestite di `config.yaml`, metadati e cron restano rifiutati, perché la libreria li
+riallinea.
 
-- se il file certificato **non è cambiato**, la copia personale viene riapplicata in silenzio;
-- se è **cambiato**, resta live la versione personale; quella nuova viene conservata e il bot, al
+Quando la libreria pubblica una versione che tocca una skill modificata:
+
+- se la skill certificata **non è cambiata**, la copia personale viene riapplicata in silenzio;
+- se è **cambiata**, resta live la versione personale; quella nuova viene conservata e il bot, al
   primo uso, spiega le differenze e chiede se tenere la propria o prendere la nuova. La risposta si
-  registra con il tool `kb_personal` (o `hermes kb resolve`) e vale per quella skill/quel SOUL fino
-  alla release successiva. La domanda arriva anche se la versione personale era già diversa prima
-  dell'update (per esempio un file modificato con un editor).
+  registra con il tool `kb_personal` (o `hermes kb resolve`) e vale per quella skill fino alla
+  release successiva. La domanda arriva anche se la versione personale era già diversa prima
+  dell'update (per esempio una skill modificata con un editor).
 
 Il **reparto IT** ha un proprio operatore con `ruolo: it` in `.autorizzazioni.yaml`: i tool
 `kb_proposals` e `kb_updates` (e i comandi `hermes kb it …`) gli mostrano le proposte di tutti gli
@@ -120,14 +125,46 @@ Il Knowledge Manager, con ruolo IT, apre la coda tramite `kb_proposals`. Verific
 provenienza e i permessi del pubblico della pagina, aggiorna wiki, indice e log, esegue
 `wiki_lint.py` e chiude la proposta dopo la verifica. La pubblicazione resta sotto controllo IT.
 
+### Memoria locale e backup
+
+Hermes ha due memorie built-in per profilo, sempre attive:
+
+- `memories/MEMORY.md` — note dell'agente (limite ~2.200 caratteri);
+- `memories/USER.md` — profilo dell'utente (limite ~1.375 caratteri).
+
+Non esiste un equivalente di `skills.create_dir` per la memoria: il percorso è
+`<profilo>/memories/` e non è configurabile. Il plugin quindi copia i due file in
+`Operatori/<nome>/memoria/<bot>/`:
+
+- dopo una scrittura del tool `memory`;
+- all'avvio e a fine turno, solo se il contenuto è cambiato;
+- se è presente Holographic, anche il suo `memory_store.db` viene copiato in modo consistente.
+
+Il backup è materiale dell'operatore, non conoscenza pubblicata: l'IT lo legge secondo i permessi del
+cloud e decide cosa, se qualcosa, promuovere nella wiki. Non vanno pubblicati dati personali, di
+clienti, credenziali o ipotesi. Le skill del Knowledge Manager descrivono i criteri di revisione.
+
+Il percorso è volutamente fuori dalla wiki: `memoria/` è una copia di lavoro, non una pagina. Il
+canale per la conoscenza condivisa resta `proposte/knowledge/` → revisione IT → wiki.
+
 ### Memoria locale opzionale
 
-Holographic è un provider di memoria Hermes con archivio SQLite per profilo. Per provarlo su un
-profilo di test, installa **Holographic**, selezionalo come provider di memoria e prova `fact_store`
-scrivendo un fatto sintetico e cercandolo in una nuova sessione. Controlla la versione installata
-perché il catalogo può servire una release precedente. Lascia `auto_extract` disattivato durante
-la prova. La ricerca di fatti scritti in italiano funziona, mentre `auto_extract` riconosce inglese,
-russo, cinese e francese. La coda Markdown della KB è gestita da ReQurv.
+Holographic è un provider di memoria Hermes con archivio SQLite per profilo. È **opzionale** e non
+sostituisce la memoria built-in né la knowledge base condivisa: i fatti restano locali al profilo.
+Per provarlo su un profilo di test, installa **Holographic**, selezionalo come provider di memoria e
+prova `fact_store` scrivendo un fatto sintetico e cercandolo in una nuova sessione. Su un bot di
+libreria l’installazione è per profilo:
+
+```sh
+hermes -p marketing plugins install holographic --enable
+hermes -p marketing config set memory.provider holographic
+hermes -p marketing memory status
+```
+
+Controlla la versione installata perché il catalogo può servire una release precedente. Lascia
+`auto_extract` disattivato durante la prova: la ricerca di fatti scritti in italiano funziona, mentre
+`auto_extract` riconosce inglese, russo, cinese e francese. Se lo usi su un bot di libreria, il
+plugin ne copia anche `memory_store.db` nel backup `memoria/`; il database non va nella wiki.
 [Documentazione Holographic](https://github.com/itpartypattaya/hermes-plugin-holographic)
 
 ### Knowledge Manager e wiki
@@ -167,7 +204,7 @@ ruolo: operatore                       # `it` per il revisore
 Biblioteca-Agenti/<bot>/   distribution.yaml, SOUL.md, skills/, config.yaml (opz.), cron/ (opz.)
 NN-Area/bots.yaml          bots: [marketing, ...]
 Operatori/<nome>/          skills/ (personali), .autorizzazioni.yaml
-  proposte/<bot>/          SOUL.md, skills/<nome>/, proposal.yaml
+  proposte/<bot>/          skills/<nome>/, proposal.yaml
   proposte/knowledge/      conoscenze raccolte (un .md per elemento)
 Wiki/                      wiki aziendale (la scrive il Knowledge Manager)
 ```

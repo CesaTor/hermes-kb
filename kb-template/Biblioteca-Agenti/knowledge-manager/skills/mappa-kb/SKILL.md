@@ -32,7 +32,7 @@ una fonte con una sintesi. La radice dell'organizzazione è la cartella che cont
 ├─ 90-Sistema/                  # governance: Tabella-Permessi.md, Registro-Pubblicazioni/, guida
 ├─ Operatori/<nome>/            # spazio personale
 │  ├─ skills/                   # skill personali (sincronizzate)
-│  ├─ proposte/<bot>/           # SOUL e skill modificate dall'operatore
+│  ├─ proposte/<bot>/           # skill modificate dall'operatore
 │  └─ proposte/knowledge/       # conoscenze raccolte, da integrare
 ├─ SETUP/                       # motore (ristretta): RUNBOOK, autorizzazioni, istruzioni
 └─ Wiki/                        # la wiki aziendale (la scrive il Knowledge Manager)
