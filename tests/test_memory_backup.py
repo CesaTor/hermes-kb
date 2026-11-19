@@ -44,10 +44,13 @@ def test_holographic_store_is_copied_consistently(connected, kb):
         db.execute("insert into facts (content) values ('fatto sintetico')")
 
     assert _backup(connected) == ["memory_store.db"]
-    target = kb["personal"] / "memoria" / "marketing" / "memory_store.db"
+    folder = kb["personal"] / "memoria" / "marketing"
+    target = folder / "memory_store.db"
     assert target.is_file()
     with sqlite3.connect(target) as db:
         assert db.execute("select content from facts").fetchone() == ("fatto sintetico",)
+    # No temp file survives: Windows refuses the rename while a handle is still open.
+    assert sorted(p.name for p in folder.iterdir()) == ["memory_store.db"]
     assert _backup(connected) == []
 
 

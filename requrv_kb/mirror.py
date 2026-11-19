@@ -173,12 +173,21 @@ def _backup_sqlite(source: Path, target: Path) -> bool:
         pass
     handle, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
     os.close(handle)
+    # A `with connection:` block commits but does not close it; Windows refuses to rename a file
+    # another handle still holds, so both connections are closed explicitly before the replace.
     try:
         import sqlite3
 
-        with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as source_db, \
-                sqlite3.connect(temporary) as target_db:
-            source_db.backup(target_db)
+        source_db = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
+        try:
+            target_db = sqlite3.connect(temporary)
+            try:
+                source_db.backup(target_db)
+                target_db.commit()
+            finally:
+                target_db.close()
+        finally:
+            source_db.close()
         os.replace(temporary, target)
         os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
         return True
