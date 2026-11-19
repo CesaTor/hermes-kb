@@ -35,7 +35,7 @@ fallito è un'informazione, un test “aggiustato” non lo è.
 | Un modello configurato | Anche un provider di test; senza modello le chat non partono |
 | Python 3.10+ | Solo per creare la fixture e per il lint della wiki |
 | macOS o Linux | Percorso principale |
-| Windows | Sezione K; è l'unico gate ancora aperto (G2) |
+| Windows | Sezione K; verificato il 19 novembre 2026 su Windows 11 con Hermes 0.23.2 (G2 chiuso) |
 | Due utenze o due home Hermes | Operatore e IT; il Desktop va provato su un utente di test |
 
 La fixture crea una KB con:
