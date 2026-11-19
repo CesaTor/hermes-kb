@@ -202,6 +202,10 @@ def _state(entry: Optional[dict[str, Any]], incoming: Optional[str], unanswered:
     personal = entry.get("personal_hash")
     if not personal:
         return "clean"
+    # The certified file *is* the operator's version: the IT integrated the proposal, so the new
+    # release carries exactly what is already live. Nothing to decide and nothing to ask.
+    if incoming in {personal, entry.get("live_hash")}:
+        return "clean"
     if unanswered or incoming != entry.get("base_hash"):
         return "conflict"
     return "reapply"

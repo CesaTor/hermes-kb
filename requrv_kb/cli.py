@@ -188,10 +188,11 @@ def _text(action: str, result: dict[str, Any]) -> str:
     if action == "duplicate":
         return f"Creato il bot personale «{result['profile']}»."
     if action == "resolve":
-        what = f"la skill «{result['name']}»"
         if result["choice"] == "keep":
-            return f"Tengo la tua versione di {what}. Vale dalla prossima conversazione."
-        return f"Prendo la nuova versione di {what}; la tua copia è stata rimossa dalle proposte."
+            return (f"Tengo la tua versione della skill «{result['name']}». "
+                    "Vale dalla prossima conversazione.")
+        return (f"Prendo la nuova versione della skill «{result['name']}»; la tua copia è stata "
+                "rimossa dalle proposte.")
     if action == "it":
         return _review_text(result)
     if action == "updates":

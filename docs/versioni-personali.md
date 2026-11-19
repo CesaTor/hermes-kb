@@ -114,7 +114,7 @@ pacchetto: l'IT può decidere, ma lo sa.
 
 ## Verifica
 
-Tutti i test (98) girano contro Hermes upstream in un worktree separato:
+Tutti i test (99) girano contro Hermes upstream in un worktree separato:
 
 ```sh
 cd <checkout upstream> && PYTHONPATH=$PWD python3 -m pytest <plugin>/tests -q

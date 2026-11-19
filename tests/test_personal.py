@@ -131,6 +131,19 @@ print(json.dumps(prompt.pre_llm_call(session_id="s2"), ensure_ascii=False))
     assert "Vuoi tenere la tua versione o prendere la nuova?" in lines[2]
 
 
+def test_a_release_that_carries_the_operators_own_text_asks_nothing(connected, kb):
+    """After the IT accepts a proposal, the library ships the operator's own text: no question."""
+    connected.kb("install", "marketing")
+    bot = connected.profile("marketing")
+    _edit(connected, bot, "skills/brand/SKILL.md", MIO_BRAND)
+    _publish(kb, "2.0.0", brand=MIO_BRAND)
+
+    result = connected.kb("update", "marketing")
+    assert result["pending"] == [] and result["reapplied"] == []
+    assert (bot / "skills" / "brand" / "SKILL.md").read_text() == MIO_BRAND
+    assert connected.kb("status")["bots"][0]["pending"] == 0
+
+
 def test_take_applies_the_certified_skill(connected, kb):
     connected.kb("install", "marketing")
     bot = connected.profile("marketing")
